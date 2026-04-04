@@ -27,6 +27,7 @@ dev = [
     "pytest-subprocess",
     "pytest-cov",
     "pytest-timeout",
+    "pre-commit>=4.5.1",
 ]
 
 [tool.ruff]
