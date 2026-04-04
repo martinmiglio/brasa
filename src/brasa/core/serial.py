@@ -13,7 +13,9 @@ _REPL_NOISE = (">>>", "raw REPL; CTRL-B to exit", ">")
 class SerialReader:
     """Unified serial reader for both `brasa serial` (blocking) and `brasa dev` (background)."""
 
-    def __init__(self, port: str, baud: int = 115200, filter_repl: bool = False) -> None:
+    def __init__(
+        self, port: str, baud: int = 115200, filter_repl: bool = False
+    ) -> None:
         self._port = port
         self._baud = baud
         self._filter_repl = filter_repl
