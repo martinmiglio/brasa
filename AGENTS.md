@@ -20,6 +20,12 @@ uv run pytest                  # run tests
 uv run ruff check src/         # lint
 uv run ruff format src/        # format
 uv run ty check src/           # type check
+
+# Or use Make targets:
+make check                     # lint + typecheck + test
+make lint / make format        # ruff
+make typecheck                 # ty
+make test / make test-cov      # pytest
 ```
 
 ## Code style
