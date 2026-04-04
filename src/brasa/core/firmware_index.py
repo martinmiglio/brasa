@@ -111,6 +111,13 @@ def _scrape_board_page(board: str) -> list[FirmwareEntry]:
     url = f"{_BASE_URL}/download/{board}/"
     output.status("firmware", f"fetching index for {board}")
     response = httpx.get(url, follow_redirects=True)
+    if response.status_code == 404:
+        output.error(
+            f"board '{board}' not found on micropython.org — "
+            "run 'brasa firmware list' with a valid board identifier "
+            "(e.g. ESP8266_GENERIC, ESP32_GENERIC, RPI_PICO)"
+        )
+        raise SystemExit(1)
     response.raise_for_status()
 
     parser = _FirmwareLinkParser()
