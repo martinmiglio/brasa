@@ -61,6 +61,12 @@ def _deploy_romfs(port: str, cfg: DeployConfig) -> None:
         status("deploy", f"deploying via romfs from {cfg.src}/")
         args: list[str] = ["romfs"]
         if cfg.mpy_compile:
+            if shutil.which("mpy-cross") is None:
+                error(
+                    "mpy-cross is required when mpy_compile is enabled but was not found on PATH. "
+                    "Install it with `uv add mpy-cross` or set mpy_compile = false in brasa.toml"
+                )
+                raise SystemExit(1)
             args.append("--mpy")
         args.extend(["deploy", tmpdir + "/"])
         mpremote_run(port, *args)
