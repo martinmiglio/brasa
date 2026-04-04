@@ -1,5 +1,6 @@
 """Project configuration loading from brasa.toml or pyproject.toml."""
 
+import dataclasses
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -83,29 +84,36 @@ def _find_config_file() -> tuple[Path | None, dict]:
     return None, {}
 
 
+def _parse_section[T](cls: type[T], raw: dict) -> T:
+    """Construct a frozen dataclass from a raw TOML dict.
+
+    Unknown keys are silently ignored and TOML lists are converted to
+    tuples for tuple-typed fields.
+    """
+    known = {f.name for f in dataclasses.fields(cls)}
+    kwargs: dict[str, object] = {}
+    for k, v in raw.items():
+        if k not in known:
+            continue
+        if isinstance(v, list):
+            kwargs[k] = tuple(v)
+        else:
+            kwargs[k] = v
+    return cls(**kwargs)  # type: ignore[call-arg]
+
+
 def _parse_config(data: dict) -> BrasaConfig:
     """Build a :class:`BrasaConfig` from a raw TOML dict.
 
     Missing sections and keys fall back to dataclass defaults.  TOML
     lists for ``boot_files`` and ``patterns`` are converted to tuples.
     """
-    fw_raw = data.get("firmware", {})
-    firmware = FirmwareConfig(**{k: v for k, v in fw_raw.items() if k in FirmwareConfig.__dataclass_fields__})
-
-    deploy_raw = data.get("deploy", {})
-    if "boot_files" in deploy_raw and isinstance(deploy_raw["boot_files"], list):
-        deploy_raw = {**deploy_raw, "boot_files": tuple(deploy_raw["boot_files"])}
-    deploy = DeployConfig(**{k: v for k, v in deploy_raw.items() if k in DeployConfig.__dataclass_fields__})
-
-    serial_raw = data.get("serial", {})
-    serial = SerialConfig(**{k: v for k, v in serial_raw.items() if k in SerialConfig.__dataclass_fields__})
-
-    port_raw = data.get("port", {})
-    if "patterns" in port_raw and isinstance(port_raw["patterns"], list):
-        port_raw = {**port_raw, "patterns": tuple(port_raw["patterns"])}
-    port = PortConfig(**{k: v for k, v in port_raw.items() if k in PortConfig.__dataclass_fields__})
-
-    return BrasaConfig(firmware=firmware, deploy=deploy, serial=serial, port=port)
+    return BrasaConfig(
+        firmware=_parse_section(FirmwareConfig, data.get("firmware", {})),
+        deploy=_parse_section(DeployConfig, data.get("deploy", {})),
+        serial=_parse_section(SerialConfig, data.get("serial", {})),
+        port=_parse_section(PortConfig, data.get("port", {})),
+    )
 
 
 def load_config() -> BrasaConfig:
