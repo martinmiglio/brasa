@@ -68,7 +68,9 @@ def _watch_loop(port: str, cfg: BrasaConfig, reader: SerialReader) -> None:
                 break
             except (subprocess.CalledProcessError, OSError):
                 if attempt < 2:
-                    warn(f"deploy failed, retrying in {_DEPLOY_RETRY_DELAY}s (attempt {attempt + 1}/3)")
+                    warn(
+                        f"deploy failed, retrying in {_DEPLOY_RETRY_DELAY}s (attempt {attempt + 1}/3)"
+                    )
                     time.sleep(_DEPLOY_RETRY_DELAY)
 
         if deployed:

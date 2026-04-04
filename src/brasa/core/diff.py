@@ -65,7 +65,9 @@ def diff_files(port: str, cfg: DeployConfig) -> list[FileDiff]:
                 tofile=f"local:{cfg.src}/{name}",
             )
         )
-        diffs.append(FileDiff(path=name, status=DiffStatus.MODIFIED, diff_lines=diff_lines))
+        diffs.append(
+            FileDiff(path=name, status=DiffStatus.MODIFIED, diff_lines=diff_lines)
+        )
 
     # Local-only files.
     for name in sorted(local_files - device_files):
