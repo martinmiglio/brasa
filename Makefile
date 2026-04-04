@@ -1,7 +1,10 @@
-.PHONY: install lint format typecheck test test-cov check
+.PHONY: setup install lint format typecheck test test-cov check
 
-install:
+setup:
 	uv sync
+	uv run pre-commit install
+
+install: setup
 
 lint:
 	uv run ruff check src/
