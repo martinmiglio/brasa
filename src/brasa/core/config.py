@@ -12,8 +12,8 @@ from brasa.core.output import error
 class FirmwareConfig:
     """Firmware flashing settings."""
 
-    board: str = "ESP8266"
-    variant: str = "GENERIC"
+    board: str = "ESP8266_GENERIC"
+    variant: str = ""
     version: str = ""
     date: str = ""
 

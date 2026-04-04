@@ -91,15 +91,21 @@ def test_load_from_brasa_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     _assert_full_config(load_config())
 
 
-def test_load_from_pyproject_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_from_pyproject_toml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "pyproject.toml", _FULL_PYPROJECT_TOML)
     monkeypatch.chdir(tmp_path)
     _assert_full_config(load_config())
 
 
-def test_brasa_toml_takes_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_brasa_toml_takes_precedence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[firmware]\nboard = "FROM_BRASA"\n')
-    _write(tmp_path, "pyproject.toml", '[tool.brasa.firmware]\nboard = "FROM_PYPROJECT"\n')
+    _write(
+        tmp_path, "pyproject.toml", '[tool.brasa.firmware]\nboard = "FROM_PYPROJECT"\n'
+    )
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
     assert cfg.firmware.board == "FROM_BRASA"
@@ -108,13 +114,17 @@ def test_brasa_toml_takes_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyP
 # ── No config ───────────────────────────────────────────────────────────────
 
 
-def test_load_config_no_file_returns_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_no_file_returns_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
     assert cfg == BrasaConfig()
 
 
-def test_require_config_no_file_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_require_config_no_file_exits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     with pytest.raises(SystemExit, match="1"):
         require_config()
@@ -123,7 +133,9 @@ def test_require_config_no_file_exits(tmp_path: Path, monkeypatch: pytest.Monkey
 # ── Partial configs ─────────────────────────────────────────────────────────
 
 
-def test_partial_config_firmware_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_partial_config_firmware_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[firmware]\nboard = "RP2040"\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -133,7 +145,9 @@ def test_partial_config_firmware_only(tmp_path: Path, monkeypatch: pytest.Monkey
     assert cfg.port == PortConfig()
 
 
-def test_partial_config_deploy_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_partial_config_deploy_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[deploy]\nsrc = "lib"\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -144,7 +158,9 @@ def test_partial_config_deploy_only(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 # ── Tuple conversions ───────────────────────────────────────────────────────
 
 
-def test_boot_files_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_boot_files_converted_to_tuple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[deploy]\nboot_files = ["a.py", "b.py"]\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -152,7 +168,9 @@ def test_boot_files_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.Monke
     assert isinstance(cfg.deploy.boot_files, tuple)
 
 
-def test_patterns_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_patterns_converted_to_tuple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[port]\npatterns = ["/dev/ttyUSB*"]\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -165,8 +183,8 @@ def test_patterns_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 def test_default_values() -> None:
     cfg = BrasaConfig()
-    assert cfg.firmware.board == "ESP8266"
-    assert cfg.firmware.variant == "GENERIC"
+    assert cfg.firmware.board == "ESP8266_GENERIC"
+    assert cfg.firmware.variant == ""
     assert cfg.firmware.version == ""
     assert cfg.firmware.date == ""
     assert cfg.deploy.src == "src"

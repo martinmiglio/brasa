@@ -11,9 +11,12 @@ from brasa.core.output import success
 from brasa.core.port import resolve_port
 
 
-@app.command()
+@app.command(deprecated=True)
 def flash(ctx: typer.Context) -> None:
-    """Download and flash MicroPython firmware to the device."""
+    """Download and flash MicroPython firmware. Use 'brasa firmware install --from-config' instead."""
+    output.warn(
+        "'brasa flash' is deprecated — use 'brasa firmware install --from-config'"
+    )
     cfg = require_config()
 
     if not cfg.firmware.version:
