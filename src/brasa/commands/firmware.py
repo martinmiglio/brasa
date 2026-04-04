@@ -1,4 +1,4 @@
-"""firmware command group — discover, download, install, and pin MicroPython firmware."""
+"""firmware command group — discover, download, install, and select MicroPython firmware."""
 
 import sys
 from typing import Annotated
@@ -28,7 +28,7 @@ from brasa.core.toml_writer import pin_firmware as write_pin
 
 firmware_app = typer.Typer(
     name="firmware",
-    help="Manage MicroPython firmware — list, download, install, pin.",
+    help="Manage MicroPython firmware — list, download, install, select.",
     no_args_is_help=True,
 )
 
@@ -242,7 +242,7 @@ def install(
         False, "--from-config", help="Use brasa.toml settings"
     ),
 ) -> None:
-    """Download and install firmware onto the device, then pin to config."""
+    """Download and install firmware onto the device, then save to config."""
     port_flag = ctx.obj.get("port") if ctx.obj else None
     entry = _resolve_entry(
         board, variant, version, from_config=from_config, port=port_flag
@@ -258,16 +258,16 @@ def install(
             install_firmware(firmware_path, port=port, platform="esp")
 
     write_pin(entry.board, entry.variant, entry.version, entry.date)
-    output.success("firmware installed and pinned to brasa.toml")
+    output.success("firmware installed and saved to brasa.toml")
 
 
 @firmware_app.command()
-def pin(
+def select(
     board: str | None = typer.Option(None, "--board", "-b", help="Board identifier"),
     variant: str | None = typer.Option(None, "--variant", help="Board variant"),
     version: str | None = typer.Option(None, "--version", help="Firmware version"),
 ) -> None:
-    """Pin a firmware version in brasa.toml (no flash)."""
+    """Select a firmware version and save to brasa.toml (no flash)."""
     entry = _resolve_entry(board, variant, version, use_config=False)
     path = write_pin(entry.board, entry.variant, entry.version, entry.date)
-    output.success(f"firmware pinned in {path}")
+    output.success(f"firmware saved to {path}")
