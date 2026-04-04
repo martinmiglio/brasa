@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 
 from brasa.cli import app
 from brasa.core.config import DeployConfig
-from brasa.core.diff import FileDiff, diff_files, print_diff
+from brasa.core.diff import DiffStatus, FileDiff, diff_files, print_diff
 
 runner = CliRunner()
 
@@ -47,7 +47,7 @@ def test_identical_files_no_diff(
     diffs = diff_files("/dev/test", cfg)
     # helper.py is device-only
     assert len(diffs) == 1
-    assert diffs[0].status == "device_only"
+    assert diffs[0].status == DiffStatus.DEVICE_ONLY
     assert diffs[0].path == "helper.py"
 
 
@@ -65,7 +65,7 @@ def test_modified_file(mock_ls: MagicMock, mock_cat: MagicMock, tmp_path: Path) 
     }[path]
 
     diffs = diff_files("/dev/test", cfg)
-    modified = [d for d in diffs if d.status == "modified"]
+    modified = [d for d in diffs if d.status == DiffStatus.MODIFIED]
     assert len(modified) == 1
     assert modified[0].path == "boot.py"
     assert any("device:/boot.py" in line for line in modified[0].diff_lines)
@@ -80,7 +80,7 @@ def test_local_only_file(
     mock_cat.return_value = "# boot"
 
     diffs = diff_files("/dev/test", cfg)
-    local_only = [d for d in diffs if d.status == "local_only"]
+    local_only = [d for d in diffs if d.status == DiffStatus.LOCAL_ONLY]
     assert len(local_only) == 1
     assert local_only[0].path == "extra.py"
 
@@ -94,7 +94,7 @@ def test_device_only_file(
     mock_cat.return_value = "# boot"
 
     diffs = diff_files("/dev/test", cfg)
-    device_only = [d for d in diffs if d.status == "device_only"]
+    device_only = [d for d in diffs if d.status == DiffStatus.DEVICE_ONLY]
     assert len(device_only) == 1
     assert device_only[0].path == "orphan.py"
 
@@ -122,7 +122,7 @@ def test_print_diff_with_modified(capsys: pytest.CaptureFixture[str]) -> None:
     diffs = [
         FileDiff(
             path="boot.py",
-            status="modified",
+            status=DiffStatus.MODIFIED,
             diff_lines=[
                 "--- device:/boot.py\n",
                 "+++ local:src/boot.py\n",
@@ -141,8 +141,8 @@ def test_print_diff_with_local_and_device_only(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     diffs = [
-        FileDiff(path="new.py", status="local_only", diff_lines=[]),
-        FileDiff(path="old.py", status="device_only", diff_lines=[]),
+        FileDiff(path="new.py", status=DiffStatus.LOCAL_ONLY, diff_lines=[]),
+        FileDiff(path="old.py", status=DiffStatus.DEVICE_ONLY, diff_lines=[]),
     ]
     print_diff(diffs)
     captured = capsys.readouterr()
@@ -158,7 +158,7 @@ def test_print_diff_with_local_and_device_only(
 @patch("brasa.commands.diff.print_diff")
 @patch("brasa.commands.diff.diff_files", return_value=[])
 @patch("brasa.commands.diff.port_lock", return_value=nullcontext())
-@patch("brasa.commands.diff.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.diff.resolve_port", return_value="/dev/cu.test")
 @patch(
     "brasa.commands.diff.require_config",
     return_value=MagicMock(deploy=DeployConfig()),

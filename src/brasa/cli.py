@@ -9,6 +9,11 @@ app = typer.Typer(
 )
 
 
+def port_override(ctx: typer.Context) -> str | None:
+    """Extract the ``--port`` override from the CLI context."""
+    return ctx.obj.get("port") if ctx.obj else None
+
+
 def _version_callback(value: bool) -> None:
     if value:
         print(f"brasa {version('brasa')}")

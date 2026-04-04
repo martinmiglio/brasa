@@ -20,6 +20,13 @@ _KNOWN_VENDOR_IDS: dict[str, str] = {
 }
 
 
+def resolve_port(override: str | None, patterns: Sequence[str] | None = None) -> str:
+    """Return *override* if given, otherwise auto-detect a port."""
+    if override:
+        return override
+    return detect_port(patterns)
+
+
 def detect_port(patterns: Sequence[str] | None = None) -> str:
     """Detect a serial port by globbing *patterns*.
 

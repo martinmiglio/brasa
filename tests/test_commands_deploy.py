@@ -15,7 +15,7 @@ runner = CliRunner()
 @patch("brasa.commands.deploy.dtr_reset")
 @patch("brasa.commands.deploy.deploy_to_device")
 @patch("brasa.commands.deploy.port_lock", return_value=nullcontext())
-@patch("brasa.commands.deploy.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.deploy.resolve_port", return_value="/dev/cu.test")
 @patch("brasa.commands.deploy.require_config", return_value=BrasaConfig())
 def test_deploy_command(
     mock_config: MagicMock,
