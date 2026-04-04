@@ -4,6 +4,7 @@ import glob
 import json
 import subprocess
 from collections.abc import Sequence
+from typing import Any
 
 from brasa.core import output
 
@@ -76,24 +77,22 @@ def _usb_tree_fallback() -> None:
     output.warn("USB device(s) detected but no matching serial driver found")
 
 
-def _extract_usb_devices(data: dict[str, object]) -> list[dict[str, object]]:
+def _extract_usb_devices(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Recursively pull USB device entries from system_profiler JSON."""
-    devices: list[dict[str, object]] = []
-    items: object = data.get("SPUSBDataType", [])
+    devices: list[dict[str, Any]] = []
+    items = data.get("SPUSBDataType", [])
     if isinstance(items, list):
         _walk_items(items, devices)
     return devices
 
 
-def _walk_items(
-    items: list[object], acc: list[dict[str, object]]
-) -> None:
+def _walk_items(items: list[Any], acc: list[dict[str, Any]]) -> None:
     for item in items:
         if not isinstance(item, dict):
             continue
         # A device entry has a vendor_id key; hubs may just nest children.
         if "vendor_id" in item:
-            acc.append(item)  # type: ignore[arg-type]
-        children: object = item.get("_items")
+            acc.append(item)
+        children = item.get("_items")
         if isinstance(children, list):
             _walk_items(children, acc)
