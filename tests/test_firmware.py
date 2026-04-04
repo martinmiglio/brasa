@@ -33,7 +33,7 @@ def test_firmware_cache_path() -> None:
         board="ESP32", variant="GENERIC", version="1.23.0", date="2025-01-01"
     )
     path = firmware_cache_path(cfg)
-    assert path == Path("firmware/ESP32_GENERIC-2025-01-01-v1.23.0.bin")
+    assert path == Path(".brasa/firmware/ESP32_GENERIC-2025-01-01-v1.23.0.bin")
 
 
 # ── download_firmware — cached ──────────────────────────────────────────────
