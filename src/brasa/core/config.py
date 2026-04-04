@@ -28,6 +28,13 @@ class DeployConfig:
     romfs: bool = True
     mpy_compile: bool = True
 
+    @property
+    def excluded_filenames(self) -> set[str]:
+        """Return bare filenames that should be excluded from source deploys."""
+        return {Path(name).name for name in self.boot_files} | {
+            Path(self.env_file).name
+        }
+
 
 @dataclass(frozen=True)
 class SerialConfig:

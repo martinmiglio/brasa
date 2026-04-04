@@ -9,11 +9,6 @@ from brasa.core.device import fs_cp, mpremote_run
 from brasa.core.output import error, status
 
 
-def _excluded_filenames(cfg: DeployConfig) -> set[str]:
-    """Return bare filenames that should be excluded from source deploys."""
-    return {Path(name).name for name in cfg.boot_files} | {Path(cfg.env_file).name}
-
-
 def deploy(port: str, cfg: DeployConfig) -> None:
     """Deploy project files to the device. Caller must hold the port lock."""
     _copy_boot_files(port, cfg)
@@ -48,7 +43,7 @@ def _deploy_romfs(port: str, cfg: DeployConfig) -> None:
     tmpdir = tempfile.mkdtemp(prefix="brasa-deploy-")
 
     try:
-        exclude = _excluded_filenames(cfg)
+        exclude = cfg.excluded_filenames
         for py_file in src_dir.rglob("*.py"):
             if py_file.name in exclude:
                 continue
@@ -77,7 +72,7 @@ def _deploy_romfs(port: str, cfg: DeployConfig) -> None:
 def _deploy_flat(port: str, cfg: DeployConfig) -> None:
     """Copy all source files to the device root (no romfs)."""
     src_dir = Path(cfg.src)
-    exclude = _excluded_filenames(cfg)
+    exclude = cfg.excluded_filenames
 
     for src_file in src_dir.rglob("*"):
         if not src_file.is_file():
