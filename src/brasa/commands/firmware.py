@@ -160,6 +160,18 @@ def _resolve_entry(
         )
 
     resolved_board = _resolve_board(board, port=port, use_config=use_config)
+
+    # Fill variant/version from config if not given via CLI flags
+    if use_config and (variant is None or version is None):
+        cfg = load_config()
+        if cfg.firmware.board == resolved_board:
+            if variant is None and cfg.firmware.variant:
+                variant = cfg.firmware.variant
+                output.status("firmware", f"using variant from config: {variant}")
+            if version is None and cfg.firmware.version:
+                version = cfg.firmware.version
+                output.status("firmware", f"using version from config: {version}")
+
     index = fetch_board_index(resolved_board, force_refresh=refresh)
 
     if variant is None:
