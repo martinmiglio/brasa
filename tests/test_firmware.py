@@ -85,7 +85,7 @@ def test_download_firmware_downloads_when_not_cached(
 
 def test_flash_firmware_calls_esptool(fp) -> None:  # type: ignore[no-untyped-def]
     """Test that flash_firmware invokes esptool with correct arguments."""
-    fp.register(["esptool", "--port", "/dev/cu.test", "erase_flash"])
+    fp.register(["esptool", "--port", "/dev/cu.test", "erase-flash"])
     fp.register(
         [
             "esptool",
@@ -93,8 +93,8 @@ def test_flash_firmware_calls_esptool(fp) -> None:  # type: ignore[no-untyped-de
             "/dev/cu.test",
             "--baud",
             "460800",
-            "write_flash",
-            "--flash_size=detect",
+            "write-flash",
+            "--flash-size=detect",
             "0",
             "firmware/test.bin",
         ]
@@ -102,7 +102,7 @@ def test_flash_firmware_calls_esptool(fp) -> None:  # type: ignore[no-untyped-de
 
     flash_firmware("/dev/cu.test", Path("firmware/test.bin"))
 
-    assert fp.call_count(["esptool", "--port", "/dev/cu.test", "erase_flash"]) == 1
+    assert fp.call_count(["esptool", "--port", "/dev/cu.test", "erase-flash"]) == 1
     assert (
         fp.call_count(
             [
@@ -111,8 +111,8 @@ def test_flash_firmware_calls_esptool(fp) -> None:  # type: ignore[no-untyped-de
                 "/dev/cu.test",
                 "--baud",
                 "460800",
-                "write_flash",
-                "--flash_size=detect",
+                "write-flash",
+                "--flash-size=detect",
                 "0",
                 "firmware/test.bin",
             ]
