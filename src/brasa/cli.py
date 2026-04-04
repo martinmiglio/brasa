@@ -33,6 +33,7 @@ def _main(
 from brasa.commands import (  # noqa: E402, F811
     deploy,
     detect,
+    dev,
     diff,
     exec,
     flash,
@@ -42,7 +43,17 @@ from brasa.commands import (  # noqa: E402, F811
 )
 
 # Keep references so linters don't flag unused imports.
-__all__ = ["deploy", "detect", "diff", "exec", "flash", "repl", "restart", "serial"]
+__all__ = [
+    "deploy",
+    "detect",
+    "dev",
+    "diff",
+    "exec",
+    "flash",
+    "repl",
+    "restart",
+    "serial",
+]
 
 
 def main() -> None:
