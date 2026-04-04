@@ -83,9 +83,7 @@ def test_fs_cp(fp: pytest.fixture) -> None:
     )
     fs_cp(PORT, "main.py", ":/main.py")
     assert (
-        fp.call_count(
-            ["mpremote", "connect", PORT, "fs", "cp", "main.py", ":/main.py"]
-        )
+        fp.call_count(["mpremote", "connect", PORT, "fs", "cp", "main.py", ":/main.py"])
         == 1
     )
 
