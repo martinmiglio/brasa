@@ -16,5 +16,8 @@ dist/
 *.swp
 *.swo
 
+# Brasa cache
+.brasa/
+
 # OS
 .DS_Store

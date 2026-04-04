@@ -22,8 +22,8 @@ def firmware_url(cfg: FirmwareConfig) -> str:
 
 
 def firmware_cache_path(cfg: FirmwareConfig) -> Path:
-    """Return the local cache path for the firmware binary (firmware/<filename>)."""
-    return Path("firmware") / _firmware_filename(cfg)
+    """Return the local cache path for the firmware binary (.brasa/firmware/<filename>)."""
+    return Path(".brasa/firmware") / _firmware_filename(cfg)
 
 
 def download_firmware(cfg: FirmwareConfig) -> Path:
