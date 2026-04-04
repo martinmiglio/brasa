@@ -1,9 +1,13 @@
 """firmware command group — discover, download, install, and pin MicroPython firmware."""
 
+import sys
+from typing import Annotated
+
 import typer
 
 from brasa.core import output
-from brasa.core.config import require_config
+from brasa.core.config import load_config, require_config
+from brasa.core.device import detect_board
 from brasa.core.firmware import (
     download_entry,
     install_firmware,
@@ -13,6 +17,7 @@ from brasa.core.firmware_index import (
     BoardIndex,
     FirmwareEntry,
     fetch_board_index,
+    fetch_board_list,
     find_entry,
     list_variants,
     list_versions,
@@ -28,15 +33,61 @@ firmware_app = typer.Typer(
 )
 
 
-def _prompt_board() -> str:
-    """Interactively prompt for a board name."""
+def _is_interactive() -> bool:
+    """Check if stdin is a real terminal (not piped/redirected)."""
+    return sys.stdin.isatty()
+
+
+# ── Board resolution ───────────────────────────────────────────────────────
+
+
+def _resolve_board(
+    board: str | None, *, port: str | None = None, use_config: bool = True
+) -> str:
+    """Resolve board from flag → config → device → interactive prompt."""
+    if board:
+        return board
+
+    if use_config:
+        cfg = load_config()
+        if cfg.firmware.board and cfg.firmware.version:
+            output.status("firmware", f"using board from config: {cfg.firmware.board}")
+            return cfg.firmware.board
+
+    # Device auto-detect (best-effort)
+    try:
+        resolved_port = resolve_port(port)
+        detected = detect_board(resolved_port)
+        if detected:
+            if not _is_interactive():
+                return detected
+            import questionary
+
+            if questionary.confirm(
+                f"Detected {detected} from device. Use it?", default=True
+            ).ask():
+                return detected
+    except (SystemExit, OSError):
+        pass
+
+    # Interactive: fuzzy-searchable board list
     import questionary
 
-    board = questionary.text("Board identifier (e.g. ESP32_GENERIC, RPI_PICO):").ask()
-    if not board:
-        output.error("no board specified")
+    boards = fetch_board_list()
+    board_ids = [b.id for b in boards]
+    meta = {b.id: b.name for b in boards}
+    selected = questionary.autocomplete(
+        "Board:",
+        choices=board_ids,
+        meta_information=meta,
+    ).ask()
+    if not selected or selected not in board_ids:
+        output.error("no board selected")
         raise SystemExit(1)
-    return board.strip()
+    return selected
+
+
+# ── Variant / version prompts ──────────────────────────────────────────────
 
 
 def _prompt_variant(index: BoardIndex) -> str:
@@ -45,7 +96,10 @@ def _prompt_variant(index: BoardIndex) -> str:
 
     variants = list_variants(index)
     if len(variants) == 1:
-        return variants[0]
+        chosen = variants[0]
+        label = chosen if chosen else "(default)"
+        output.status("firmware", f"auto-selected variant: {label}")
+        return chosen
     labels = [v if v else "(default)" for v in variants]
     choice = questionary.select("Variant:", choices=labels).ask()
     if choice is None:
@@ -67,13 +121,18 @@ def _prompt_version(index: BoardIndex, variant: str) -> str:
     return choice
 
 
+# ── Entry resolution ───────────────────────────────────────────────────────
+
+
 def _resolve_entry(
     board: str | None,
     variant: str | None,
     version: str | None,
     *,
     from_config: bool = False,
+    use_config: bool = True,
     refresh: bool = False,
+    port: str | None = None,
 ) -> FirmwareEntry:
     """Resolve a FirmwareEntry from flags, config, or interactive prompts."""
     if from_config:
@@ -83,7 +142,6 @@ def _resolve_entry(
             output.error("firmware.version is required in config for --from-config")
             raise SystemExit(1)
         index = fetch_board_index(fw.board, force_refresh=refresh)
-        # Try to find by board+variant+version in index
         entry = find_entry(index, fw.variant, fw.version)
         if entry:
             return entry
@@ -101,10 +159,8 @@ def _resolve_entry(
             ext=ext,
         )
 
-    if board is None:
-        board = _prompt_board()
-
-    index = fetch_board_index(board, force_refresh=refresh)
+    resolved_board = _resolve_board(board, port=port, use_config=use_config)
+    index = fetch_board_index(resolved_board, force_refresh=refresh)
 
     if variant is None:
         variant = _prompt_variant(index)
@@ -115,24 +171,28 @@ def _resolve_entry(
     entry = find_entry(index, variant, version)
     if entry is None:
         output.error(
-            f"no firmware found for {board} variant={variant!r} version={version}"
+            f"no firmware found for {resolved_board} variant={variant!r} version={version}"
         )
         raise SystemExit(1)
     return entry
 
 
+# ── Commands ───────────────────────────────────────────────────────────────
+
+
 @firmware_app.command("list")
 def list_cmd(
-    board: str = typer.Option(..., "--board", "-b", help="Board identifier"),
+    board: Annotated[str | None, typer.Argument(help="Board identifier")] = None,
     refresh: bool = typer.Option(False, "--refresh", help="Force refresh cached index"),
     preview: bool = typer.Option(False, "--preview", help="Include preview builds"),
 ) -> None:
     """List available firmware versions for a board."""
-    index = fetch_board_index(board, force_refresh=refresh)
+    resolved_board = _resolve_board(board)
+    index = fetch_board_index(resolved_board, force_refresh=refresh)
     variants = list_variants(index)
 
     if not variants:
-        output.warn(f"no firmware found for {board}")
+        output.warn(f"no firmware found for {resolved_board}")
         return
 
     for variant in variants:
@@ -170,20 +230,23 @@ def install(
         False, "--from-config", help="Use brasa.toml settings"
     ),
 ) -> None:
-    """Download and install firmware onto the device."""
-    entry = _resolve_entry(board, variant, version, from_config=from_config)
+    """Download and install firmware onto the device, then pin to config."""
+    port_flag = ctx.obj.get("port") if ctx.obj else None
+    entry = _resolve_entry(
+        board, variant, version, from_config=from_config, port=port_flag
+    )
     firmware_path = download_entry(entry)
     platform = platform_for_board(entry.board)
 
     if platform == "uf2":
         install_firmware(firmware_path, platform="uf2")
     else:
-        port_flag = ctx.obj.get("port") if ctx.obj else None
         port = resolve_port(port_flag)
         with port_lock(port, "firmware install"):
             install_firmware(firmware_path, port=port, platform="esp")
 
-    output.success("firmware installed")
+    write_pin(entry.board, entry.variant, entry.version, entry.date)
+    output.success("firmware installed and pinned to brasa.toml")
 
 
 @firmware_app.command()
@@ -192,7 +255,7 @@ def pin(
     variant: str | None = typer.Option(None, "--variant", help="Board variant"),
     version: str | None = typer.Option(None, "--version", help="Firmware version"),
 ) -> None:
-    """Pin a firmware version in brasa.toml."""
-    entry = _resolve_entry(board, variant, version)
+    """Pin a firmware version in brasa.toml (no flash)."""
+    entry = _resolve_entry(board, variant, version, use_config=False)
     path = write_pin(entry.board, entry.variant, entry.version, entry.date)
     output.success(f"firmware pinned in {path}")

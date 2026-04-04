@@ -56,6 +56,25 @@ def fs_ls(port: str, path: str = "/") -> str:
     return result.stdout
 
 
+_PLATFORM_TO_BOARD: dict[str, str] = {
+    "esp8266": "ESP8266_GENERIC",
+    "esp32": "ESP32_GENERIC",
+    "rp2": "RPI_PICO",
+}
+
+
+def detect_board(port: str) -> str | None:
+    """Query sys.platform on a connected device and map to a board identifier.
+
+    Returns ``None`` if the device is not reachable or the platform is unknown.
+    """
+    try:
+        platform = exec_expr(port, "import sys; print(sys.platform)").strip()
+        return _PLATFORM_TO_BOARD.get(platform)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def dtr_reset(port: str) -> None:
     """Toggle DTR to perform a hardware reset.
 

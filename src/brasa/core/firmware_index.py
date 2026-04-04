@@ -190,3 +190,88 @@ def find_entry(index: BoardIndex, variant: str, version: str) -> FirmwareEntry |
         if entry.variant == variant and entry.version == version:
             return entry
     return None
+
+
+# ── Global board list ──────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class BoardInfo:
+    """A board available on micropython.org."""
+
+    id: str
+    name: str
+
+
+class _BoardLinkParser(HTMLParser):
+    """Extract board IDs and names from micropython.org/download/."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.boards: list[tuple[str, str]] = []
+        self._current_href: str | None = None
+        self._current_text: list[str] = []
+        self._in_board_link = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "a":
+            return
+        for name, value in attrs:
+            if name == "href" and value and re.fullmatch(r"[A-Z0-9_]+", value):
+                self._in_board_link = True
+                self._current_href = value
+                self._current_text = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._in_board_link:
+            name = " ".join(self._current_text).strip()
+            if self._current_href:
+                self.boards.append((self._current_href, name))
+            self._in_board_link = False
+            self._current_href = None
+
+    def handle_data(self, data: str) -> None:
+        if self._in_board_link:
+            self._current_text.append(data.strip())
+
+
+def _board_list_path() -> Path:
+    """Return path to the cached board list JSON."""
+    return cache_dir() / "boards.json"
+
+
+def _scrape_board_list() -> list[BoardInfo]:
+    """Fetch micropython.org/download/ and extract available boards."""
+    url = f"{_BASE_URL}/download/"
+    output.status("firmware", "fetching board list")
+    response = httpx.get(url, follow_redirects=True)
+    response.raise_for_status()
+
+    parser = _BoardLinkParser()
+    parser.feed(response.text)
+
+    seen: set[str] = set()
+    boards: list[BoardInfo] = []
+    for board_id, name in parser.boards:
+        if board_id not in seen:
+            seen.add(board_id)
+            boards.append(BoardInfo(id=board_id, name=name or board_id))
+    return boards
+
+
+def fetch_board_list(*, force_refresh: bool = False) -> list[BoardInfo]:
+    """Return all available boards, using cache when fresh."""
+    path = _board_list_path()
+    if not force_refresh and _is_fresh(path):
+        output.status("firmware", "using cached board list")
+        data = json.loads(path.read_text())
+        return [BoardInfo(**b) for b in data["boards"]]
+
+    boards = _scrape_board_list()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "fetched_at": time.time(),
+        "boards": [{"id": b.id, "name": b.name} for b in boards],
+    }
+    path.write_text(json.dumps(data, indent=2))
+    return boards

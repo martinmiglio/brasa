@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from brasa.core.device import (
+    detect_board,
     dtr_reset,
     exec_expr,
     fs_cat,
@@ -125,3 +126,31 @@ def test_dtr_reset(mock_serial_cls: MagicMock) -> None:
 def test_dtr_reset_catches_exceptions(mock_serial_cls: MagicMock) -> None:
     """dtr_reset() catches exceptions gracefully."""
     dtr_reset(PORT)  # should not raise
+
+
+# ── detect_board ───────────────────────────────────────────────────────────
+
+
+@patch("brasa.core.device.exec_expr", return_value="esp8266\n")
+def test_detect_board_esp8266(mock_exec: MagicMock) -> None:
+    assert detect_board(PORT) == "ESP8266_GENERIC"
+
+
+@patch("brasa.core.device.exec_expr", return_value="esp32\n")
+def test_detect_board_esp32(mock_exec: MagicMock) -> None:
+    assert detect_board(PORT) == "ESP32_GENERIC"
+
+
+@patch("brasa.core.device.exec_expr", return_value="rp2\n")
+def test_detect_board_rp2(mock_exec: MagicMock) -> None:
+    assert detect_board(PORT) == "RPI_PICO"
+
+
+@patch("brasa.core.device.exec_expr", return_value="unknown_platform\n")
+def test_detect_board_unknown_returns_none(mock_exec: MagicMock) -> None:
+    assert detect_board(PORT) is None
+
+
+@patch("brasa.core.device.exec_expr", side_effect=Exception("device not found"))
+def test_detect_board_error_returns_none(mock_exec: MagicMock) -> None:
+    assert detect_board(PORT) is None

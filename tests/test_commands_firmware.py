@@ -27,19 +27,30 @@ _INDEX = BoardIndex(board="ESP32_GENERIC", entries=_ENTRIES, fetched_at=time.tim
 
 
 @patch("brasa.commands.firmware.fetch_board_index", return_value=_INDEX)
-def test_firmware_list(mock_fetch: MagicMock) -> None:
-    result = runner.invoke(app, ["firmware", "list", "--board", "ESP32_GENERIC"])
+@patch("brasa.commands.firmware._resolve_board", return_value="ESP32_GENERIC")
+def test_firmware_list_positional(
+    mock_resolve: MagicMock, mock_fetch: MagicMock
+) -> None:
+    result = runner.invoke(app, ["firmware", "list", "ESP32_GENERIC"])
     assert result.exit_code == 0
     assert "1.27.0" in result.output
     assert "1.26.1" in result.output
-    mock_fetch.assert_called_once_with("ESP32_GENERIC", force_refresh=False)
 
 
 @patch("brasa.commands.firmware.fetch_board_index", return_value=_INDEX)
-def test_firmware_list_refresh(mock_fetch: MagicMock) -> None:
-    result = runner.invoke(
-        app, ["firmware", "list", "--board", "ESP32_GENERIC", "--refresh"]
-    )
+@patch("brasa.commands.firmware._resolve_board", return_value="ESP32_GENERIC")
+def test_firmware_list_no_board_resolves(
+    mock_resolve: MagicMock, mock_fetch: MagicMock
+) -> None:
+    result = runner.invoke(app, ["firmware", "list"])
+    assert result.exit_code == 0
+    mock_resolve.assert_called_once_with(None)
+
+
+@patch("brasa.commands.firmware.fetch_board_index", return_value=_INDEX)
+@patch("brasa.commands.firmware._resolve_board", return_value="ESP32_GENERIC")
+def test_firmware_list_refresh(mock_resolve: MagicMock, mock_fetch: MagicMock) -> None:
+    result = runner.invoke(app, ["firmware", "list", "ESP32_GENERIC", "--refresh"])
     assert result.exit_code == 0
     mock_fetch.assert_called_once_with("ESP32_GENERIC", force_refresh=True)
 
@@ -68,6 +79,7 @@ def test_firmware_download_from_config(
 # ── firmware install ────────────────────────────────────────────────────────
 
 
+@patch("brasa.commands.firmware.write_pin")
 @patch("brasa.commands.firmware.install_firmware")
 @patch("brasa.commands.firmware.download_entry", return_value=Path("/cache/f1.bin"))
 @patch("brasa.commands.firmware.resolve_port", return_value="/dev/cu.test")
@@ -88,10 +100,12 @@ def test_firmware_install_from_config(
     mock_port: MagicMock,
     mock_dl: MagicMock,
     mock_install: MagicMock,
+    mock_pin: MagicMock,
 ) -> None:
     result = runner.invoke(app, ["firmware", "install", "--from-config"])
     assert result.exit_code == 0
     mock_install.assert_called_once()
+    mock_pin.assert_called_once_with("ESP32_GENERIC", "", "1.27.0", "20251209")
 
 
 # ── firmware pin ────────────────────────────────────────────────────────────

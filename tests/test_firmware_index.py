@@ -8,12 +8,15 @@ import pytest
 
 from brasa.core.firmware_index import (
     BoardIndex,
+    BoardInfo,
     FirmwareEntry,
+    _BoardLinkParser,
     _FirmwareLinkParser,
     _is_fresh,
     _parse_firmware_href,
     cache_dir,
     fetch_board_index,
+    fetch_board_list,
     find_entry,
     list_variants,
     list_versions,
@@ -226,4 +229,75 @@ def test_fetch_force_refresh(
     mock_fresh: MagicMock, mock_scrape: MagicMock, mock_save: MagicMock
 ) -> None:
     fetch_board_index("ESP32_GENERIC", force_refresh=True)
+    mock_scrape.assert_called_once()
+
+
+# ── Board list scraping ────────────────────────────────────────────────────
+
+_BOARD_LIST_HTML = """
+<html><body>
+<a href="ESP32_GENERIC">ESP32 / WROOM Espressif</a>
+<a href="ESP8266_GENERIC">ESP8266 Espressif</a>
+<a href="RPI_PICO">Pico Raspberry Pi</a>
+<a href="https://github.com">GitHub</a>
+<a href="/download/">Downloads</a>
+</body></html>
+"""
+
+
+def test_board_link_parser() -> None:
+    parser = _BoardLinkParser()
+    parser.feed(_BOARD_LIST_HTML)
+    assert len(parser.boards) == 3
+    ids = [b[0] for b in parser.boards]
+    assert "ESP32_GENERIC" in ids
+    assert "RPI_PICO" in ids
+
+
+def test_board_link_parser_ignores_non_board_links() -> None:
+    parser = _BoardLinkParser()
+    parser.feed('<a href="https://github.com">GH</a><a href="/download/">dl</a>')
+    assert parser.boards == []
+
+
+_BOARD_LIST = [
+    BoardInfo("ESP32_GENERIC", "ESP32 / WROOM"),
+    BoardInfo("RPI_PICO", "Pico"),
+]
+
+
+@patch("brasa.core.firmware_index._is_fresh", return_value=True)
+@patch("brasa.core.firmware_index._board_list_path")
+def test_fetch_board_list_uses_cache(
+    mock_path: MagicMock, mock_fresh: MagicMock, tmp_path: Path
+) -> None:
+    cache_file = tmp_path / "boards.json"
+    import json
+
+    cache_file.write_text(
+        json.dumps(
+            {
+                "fetched_at": time.time(),
+                "boards": [{"id": b.id, "name": b.name} for b in _BOARD_LIST],
+            }
+        )
+    )
+    mock_path.return_value = cache_file
+    result = fetch_board_list()
+    assert len(result) == 2
+    assert result[0].id == "ESP32_GENERIC"
+
+
+@patch("brasa.core.firmware_index._board_list_path")
+@patch("brasa.core.firmware_index._scrape_board_list", return_value=_BOARD_LIST)
+@patch("brasa.core.firmware_index._is_fresh", return_value=False)
+def test_fetch_board_list_scrapes_when_stale(
+    mock_fresh: MagicMock,
+    mock_scrape: MagicMock,
+    mock_path: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_path.return_value = tmp_path / "boards.json"
+    result = fetch_board_list()
+    assert len(result) == 2
     mock_scrape.assert_called_once()
