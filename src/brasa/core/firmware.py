@@ -56,7 +56,7 @@ def download_firmware(cfg: FirmwareConfig) -> Path:
 def flash_firmware(port: str, firmware_path: Path) -> None:
     """Erase flash then write firmware via esptool subprocess."""
     output.status("flash", f"erasing flash on {port}")
-    subprocess.run(["esptool", "--port", port, "erase_flash"], check=True)
+    subprocess.run(["esptool", "--port", port, "erase-flash"], check=True)
 
     output.status("flash", f"writing {firmware_path} to {port}")
     subprocess.run(
@@ -66,8 +66,8 @@ def flash_firmware(port: str, firmware_path: Path) -> None:
             port,
             "--baud",
             "460800",
-            "write_flash",
-            "--flash_size=detect",
+            "write-flash",
+            "--flash-size=detect",
             "0",
             str(firmware_path),
         ],
