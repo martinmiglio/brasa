@@ -1,6 +1,6 @@
 [project]
 name = "brasa"
-version = "0.3.0"
+version = "0.3.1"
 description = "MicroPython developer tools — flash, deploy, watch, monitor."
 readme = "README.md"
 authors = [
