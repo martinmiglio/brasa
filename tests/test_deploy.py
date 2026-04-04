@@ -23,10 +23,11 @@ def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
+@patch("brasa.core.deploy.shutil.which", return_value="/usr/bin/mpy-cross")
 @patch("brasa.core.deploy.mpremote_run")
 @patch("brasa.core.deploy.fs_cp")
 def test_deploy_romfs(
-    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, project_dir: Path
+    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, _mock_which: MagicMock, project_dir: Path
 ) -> None:
     """ROMFS deploy copies boot files then calls mpremote romfs with --mpy."""
     cfg = DeployConfig()
@@ -101,10 +102,11 @@ def test_deploy_missing_env_file(
     mock_fs_cp.assert_not_called()
 
 
+@patch("brasa.core.deploy.shutil.which", return_value="/usr/bin/mpy-cross")
 @patch("brasa.core.deploy.mpremote_run")
 @patch("brasa.core.deploy.fs_cp")
 def test_deploy_skips_missing_boot_files(
-    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, project_dir: Path
+    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, _mock_which: MagicMock, project_dir: Path
 ) -> None:
     """Boot files that don't exist on disk are silently skipped."""
     # Remove main.py so only boot.py remains.
@@ -118,10 +120,11 @@ def test_deploy_skips_missing_boot_files(
     assert "main.py" not in copied
 
 
+@patch("brasa.core.deploy.shutil.which", return_value="/usr/bin/mpy-cross")
 @patch("brasa.core.deploy.mpremote_run")
 @patch("brasa.core.deploy.fs_cp")
 def test_deploy_romfs_temp_dir_cleaned(
-    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, project_dir: Path
+    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, _mock_which: MagicMock, project_dir: Path
 ) -> None:
     """The temp directory is cleaned up after romfs deploy."""
     cfg = DeployConfig()
@@ -131,6 +134,20 @@ def test_deploy_romfs_temp_dir_cleaned(
     args = mock_mpremote.call_args[0]
     tmpdir = args[-1].rstrip("/")
     assert not Path(tmpdir).exists()
+
+
+@patch("brasa.core.deploy.shutil.which", return_value=None)
+@patch("brasa.core.deploy.mpremote_run")
+@patch("brasa.core.deploy.fs_cp")
+def test_deploy_romfs_errors_when_mpy_cross_missing(
+    mock_fs_cp: MagicMock, mock_mpremote: MagicMock, _mock_which: MagicMock, project_dir: Path
+) -> None:
+    """Deploy errors when mpy_compile=True but mpy-cross is not on PATH."""
+    cfg = DeployConfig()
+    with pytest.raises(SystemExit):
+        deploy("/dev/cu.test", cfg)
+
+    mock_mpremote.assert_not_called()
 
 
 def test_deploy_module_does_not_import_port_lock() -> None:
