@@ -46,9 +46,7 @@ def port_lock(port: str, caller: str) -> Generator[None, None, None]:
                 data = json.loads(os.pread(fd, 4096, 0).decode())
                 holder = data.get("caller", "unknown")
                 pid = data.get("pid", "?")
-                warn(
-                    f"port {port} locked by '{holder}' (pid {pid}), waiting…"
-                )
+                warn(f"port {port} locked by '{holder}' (pid {pid}), waiting…")
             except (json.JSONDecodeError, OSError):
                 warn(f"port {port} locked by another process, waiting…")
 
