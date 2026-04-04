@@ -22,6 +22,11 @@ brasa = "brasa.cli:main"
 dev = [
     "ruff>=0.15.8",
     "ty>=0.0.26",
+    "pytest",
+    "pytest-mock",
+    "pytest-subprocess",
+    "pytest-cov",
+    "pytest-timeout",
 ]
 
 [tool.ruff]
@@ -29,6 +34,13 @@ src = ["src"]
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "hardware: marks tests that require physical hardware (deselect with '-m \"not hardware\"')",
+]
+timeout = 10
 
 [build-system]
 requires = ["uv_build>=0.10.12,<0.11.0"]
