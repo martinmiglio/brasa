@@ -3,13 +3,14 @@
 import fcntl
 import json
 import os
+import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
 
 from brasa.core.output import status, warn
 
 _ENV_KEY = "BRASA_PORT_LOCKED"
-_LOCK_DIR = "/tmp"
+_LOCK_DIR = tempfile.gettempdir()
 
 
 def _lock_path(port: str) -> str:

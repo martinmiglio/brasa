@@ -15,7 +15,7 @@ runner = CliRunner()
 # ── flash command wiring ────────────────────────────────────────────────────
 
 
-@patch("brasa.commands.flash.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.flash.resolve_port", return_value="/dev/cu.test")
 @patch("brasa.commands.flash.port_lock", return_value=nullcontext())
 @patch("brasa.commands.flash.flash_firmware")
 @patch("brasa.commands.flash.download_firmware", return_value=Path("firmware/test.bin"))

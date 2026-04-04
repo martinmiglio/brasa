@@ -19,7 +19,7 @@ def test_detect_with_port_override() -> None:
     assert "/dev/ttyUSB0" in result.output
 
 
-@patch("brasa.commands.detect.detect_port", return_value="/dev/cu.autodetected")
+@patch("brasa.commands.detect.resolve_port", return_value="/dev/cu.autodetected")
 def test_detect_auto(mock_detect: MagicMock) -> None:
     result = runner.invoke(app, ["detect"])
     assert result.exit_code == 0
@@ -32,7 +32,7 @@ def test_detect_auto(mock_detect: MagicMock) -> None:
 
 @patch("brasa.commands.serial.SerialReader")
 @patch("brasa.commands.serial.port_lock", return_value=nullcontext())
-@patch("brasa.commands.serial.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.serial.resolve_port", return_value="/dev/cu.test")
 def test_serial(
     mock_detect: MagicMock, mock_lock: MagicMock, mock_reader_cls: MagicMock
 ) -> None:
@@ -57,7 +57,7 @@ def test_serial_with_port_and_baud(
 
 @patch("brasa.commands.repl.device_repl")
 @patch("brasa.commands.repl.port_lock", return_value=nullcontext())
-@patch("brasa.commands.repl.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.repl.resolve_port", return_value="/dev/cu.test")
 def test_repl(
     mock_detect: MagicMock, mock_lock: MagicMock, mock_repl: MagicMock
 ) -> None:
@@ -79,7 +79,7 @@ def test_repl_with_port_override(mock_lock: MagicMock, mock_repl: MagicMock) -> 
 
 @patch("brasa.commands.restart.port_lock", return_value=nullcontext())
 @patch("brasa.commands.restart.reset")
-@patch("brasa.commands.restart.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.restart.resolve_port", return_value="/dev/cu.test")
 def test_restart(
     mock_detect: MagicMock, mock_reset: MagicMock, mock_lock: MagicMock
 ) -> None:
@@ -103,7 +103,7 @@ def test_restart_with_port_override(
 
 @patch("brasa.commands.exec.port_lock", return_value=nullcontext())
 @patch("brasa.commands.exec.exec_expr", return_value="42")
-@patch("brasa.commands.exec.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.exec.resolve_port", return_value="/dev/cu.test")
 def test_exec(
     mock_detect: MagicMock, mock_exec: MagicMock, mock_lock: MagicMock
 ) -> None:
@@ -115,7 +115,7 @@ def test_exec(
 
 @patch("brasa.commands.exec.port_lock", return_value=nullcontext())
 @patch("brasa.commands.exec.exec_expr", return_value="")
-@patch("brasa.commands.exec.detect_port", return_value="/dev/cu.test")
+@patch("brasa.commands.exec.resolve_port", return_value="/dev/cu.test")
 def test_exec_empty_result(
     mock_detect: MagicMock, mock_exec: MagicMock, mock_lock: MagicMock
 ) -> None:

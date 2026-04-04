@@ -2,27 +2,32 @@
 
 import io
 import os
+import subprocess
 import sys
 import time
 
 import typer
 import watchfiles
 
-from brasa.cli import app
+from brasa.cli import app, port_override
 from brasa.core.config import BrasaConfig, require_config
 from brasa.core.deploy import deploy
 from brasa.core.device import dtr_reset
 from brasa.core.lock import port_lock
 from brasa.core.output import error, status, success, warn
-from brasa.core.port import detect_port
+from brasa.core.port import resolve_port
 from brasa.core.serial import SerialReader
+
+_SERIAL_RELEASE_DELAY = 1.2  # seconds for serial port to release before redeploy
+_DEPLOY_RETRY_DELAY = 10  # seconds between failed deploy retries
+_RESET_SETTLE_DELAY = 1  # seconds after device reset before resuming serial
 
 
 @app.command()
 def dev(ctx: typer.Context) -> None:
     """Deploy, watch for changes, and stream serial output."""
     cfg = require_config()
-    port = (ctx.obj.get("port") if ctx.obj else None) or detect_port(cfg.port.patterns)
+    port = resolve_port(port_override(ctx), cfg.port.patterns)
 
     with port_lock(port, "dev"):
         os.environ["BRASA_PORT_LOCKED"] = port
@@ -53,7 +58,7 @@ def _watch_loop(port: str, cfg: BrasaConfig, reader: SerialReader) -> None:
     ):
         status("dev", "changes detected, redeploying...")
         reader.pause()
-        time.sleep(1.2)
+        time.sleep(_SERIAL_RELEASE_DELAY)
 
         deployed = False
         for attempt in range(3):
@@ -61,14 +66,16 @@ def _watch_loop(port: str, cfg: BrasaConfig, reader: SerialReader) -> None:
                 deploy(port, cfg.deploy)
                 deployed = True
                 break
-            except Exception:
+            except (subprocess.CalledProcessError, OSError):
                 if attempt < 2:
-                    warn(f"deploy failed, retrying in 10s (attempt {attempt + 1}/3)")
-                    time.sleep(10)
+                    warn(
+                        f"deploy failed, retrying in {_DEPLOY_RETRY_DELAY}s (attempt {attempt + 1}/3)"
+                    )
+                    time.sleep(_DEPLOY_RETRY_DELAY)
 
         if deployed:
             dtr_reset(port)
-            time.sleep(1)
+            time.sleep(_RESET_SETTLE_DELAY)
             status("dev", "redeploy complete")
         else:
             error("deploy failed after 3 attempts")

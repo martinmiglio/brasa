@@ -19,7 +19,7 @@ def _make_patches() -> dict[str, object]:
     """Return a dict of common patches for the dev command."""
     return {
         "require_config": patch("brasa.commands.dev.require_config", return_value=_CFG),
-        "detect_port": patch("brasa.commands.dev.detect_port", return_value=_PORT),
+        "resolve_port": patch("brasa.commands.dev.resolve_port", return_value=_PORT),
         "port_lock": patch("brasa.commands.dev.port_lock", return_value=nullcontext()),
         "deploy": patch("brasa.commands.dev.deploy"),
         "dtr_reset": patch("brasa.commands.dev.dtr_reset"),
@@ -37,7 +37,7 @@ def test_initial_deploy_called() -> None:
     )
     with (
         patches["require_config"],
-        patches["detect_port"],
+        patches["resolve_port"],
         patches["port_lock"],
         patches["deploy"] as mock_deploy,
         patches["dtr_reset"] as mock_reset,
@@ -61,7 +61,7 @@ def test_file_change_triggers_redeploy() -> None:
     # Patch time.sleep to skip delays
     with (
         patches["require_config"],
-        patches["detect_port"],
+        patches["resolve_port"],
         patches["port_lock"],
         patches["deploy"] as mock_deploy,
         patches["dtr_reset"] as mock_reset,
@@ -90,7 +90,7 @@ def test_deploy_retry_logic() -> None:
     )
     with (
         patches["require_config"],
-        patches["detect_port"],
+        patches["resolve_port"],
         patches["port_lock"],
         patches["deploy"] as mock_deploy,
         patches["dtr_reset"] as mock_reset,
@@ -102,8 +102,8 @@ def test_deploy_retry_logic() -> None:
         # then fail twice, succeed on third
         mock_deploy.side_effect = [
             None,
-            RuntimeError("fail"),
-            RuntimeError("fail"),
+            OSError("fail"),
+            OSError("fail"),
             None,
         ]
         result = runner.invoke(app, ["dev"])
@@ -122,7 +122,7 @@ def test_deploy_failure_after_retries() -> None:
     )
     with (
         patches["require_config"],
-        patches["detect_port"],
+        patches["resolve_port"],
         patches["port_lock"],
         patches["deploy"] as mock_deploy,
         patches["dtr_reset"] as mock_reset,
@@ -134,9 +134,9 @@ def test_deploy_failure_after_retries() -> None:
         # Initial deploy succeeds, then all 3 retries fail
         mock_deploy.side_effect = [
             None,
-            RuntimeError("x"),
-            RuntimeError("x"),
-            RuntimeError("x"),
+            OSError("x"),
+            OSError("x"),
+            OSError("x"),
         ]
         result = runner.invoke(app, ["dev"])
         assert result.exit_code == 0
@@ -155,7 +155,7 @@ def test_keyboard_interrupt_stops_reader() -> None:
     )
     with (
         patches["require_config"],
-        patches["detect_port"],
+        patches["resolve_port"],
         patches["port_lock"],
         patches["deploy"],
         patches["dtr_reset"],
@@ -180,7 +180,7 @@ def test_port_locked_env_var_set() -> None:
     )
     with (
         patches["require_config"],
-        patches["detect_port"],
+        patches["resolve_port"],
         patches["port_lock"],
         patches["deploy"] as mock_deploy,
         patches["dtr_reset"],

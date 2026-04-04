@@ -2,16 +2,12 @@
 
 import typer
 
-from brasa.cli import app
+from brasa.cli import app, port_override
 from brasa.core.output import print_stdout
-from brasa.core.port import detect_port
+from brasa.core.port import resolve_port
 
 
 @app.command()
 def detect(ctx: typer.Context) -> None:
     """Detect the serial port of a connected MicroPython device."""
-    port = ctx.obj.get("port") if ctx.obj else None
-    if port:
-        print_stdout(port)
-    else:
-        print_stdout(detect_port())
+    print_stdout(resolve_port(port_override(ctx)))
