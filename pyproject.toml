@@ -13,6 +13,7 @@ dependencies = [
     "watchfiles",
     "mpremote>=1.24.0",
     "httpx",
+    "esptool",
 ]
 
 [project.scripts]

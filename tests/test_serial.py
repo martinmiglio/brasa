@@ -52,7 +52,12 @@ class TestSerialReader:
     ) -> None:
         """filter_repl=True suppresses REPL noise lines."""
         mock_conn = _make_mock_serial(
-            [b">>> \r\n", b"real output\r\n", b"raw REPL; CTRL-B to exit\r\n", b"> \r\n"]
+            [
+                b">>> \r\n",
+                b"real output\r\n",
+                b"raw REPL; CTRL-B to exit\r\n",
+                b"> \r\n",
+            ]
         )
         mock_serial_cls.return_value = mock_conn
 
@@ -69,7 +74,7 @@ class TestSerialReader:
         """pause() closes the serial port, resume() reopens it."""
         mock_conn = _make_mock_serial([])
         # readline blocks indefinitely returning empty bytes
-        mock_conn.readline.side_effect = lambda: (time.sleep(0.05) or b"")
+        mock_conn.readline.side_effect = lambda: time.sleep(0.05) or b""
         mock_serial_cls.return_value = mock_conn
 
         reader = SerialReader("/dev/ttyUSB0")
@@ -92,7 +97,7 @@ class TestSerialReader:
     def test_stop_exits_read_loop(self, mock_serial_cls: MagicMock) -> None:
         """stop() causes the read loop to exit and thread to finish."""
         mock_conn = _make_mock_serial([])
-        mock_conn.readline.side_effect = lambda: (time.sleep(0.05) or b"")
+        mock_conn.readline.side_effect = lambda: time.sleep(0.05) or b""
         mock_serial_cls.return_value = mock_conn
 
         reader = SerialReader("/dev/ttyUSB0")
@@ -136,10 +141,12 @@ class TestSerialReader:
         assert "serial read error" in mock_error.call_args[0][0]
 
     @patch("brasa.core.serial.pyserial.Serial")
-    def test_start_background_creates_daemon_thread(self, mock_serial_cls: MagicMock) -> None:
+    def test_start_background_creates_daemon_thread(
+        self, mock_serial_cls: MagicMock
+    ) -> None:
         """start_background() starts a daemon thread."""
         mock_conn = _make_mock_serial([])
-        mock_conn.readline.side_effect = lambda: (time.sleep(0.05) or b"")
+        mock_conn.readline.side_effect = lambda: time.sleep(0.05) or b""
         mock_serial_cls.return_value = mock_conn
 
         reader = SerialReader("/dev/ttyUSB0")

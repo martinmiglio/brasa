@@ -30,10 +30,17 @@ def _main(
 
 
 # Register commands — imported after `app` is defined to avoid circular imports.
-from brasa.commands import detect, exec, repl, restart, serial  # noqa: E402, F811
+from brasa.commands import (  # noqa: E402, F811
+    detect,
+    exec,
+    flash,
+    repl,
+    restart,
+    serial,
+)
 
 # Keep references so linters don't flag unused imports.
-__all__ = ["detect", "exec", "repl", "restart", "serial"]
+__all__ = ["detect", "exec", "flash", "repl", "restart", "serial"]
 
 
 def main() -> None:

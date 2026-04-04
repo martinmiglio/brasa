@@ -3,7 +3,6 @@
 import fcntl
 import json
 import os
-from unittest.mock import call
 
 import pytest
 
@@ -55,9 +54,7 @@ class TestPortLockHappyPath:
 class TestReentrant:
     """When BRASA_PORT_LOCKED is already set to the port, skip locking."""
 
-    def test_reentrant_skips_lock(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_reentrant_skips_lock(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(_ENV_KEY, PORT)
         # Should not raise or attempt to acquire — just yield.
         with port_lock(PORT, CALLER):
