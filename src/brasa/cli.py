@@ -31,6 +31,7 @@ def _main(
 
 # Register commands — imported after `app` is defined to avoid circular imports.
 from brasa.commands import (  # noqa: E402, F811
+    deploy,
     detect,
     diff,
     exec,
@@ -41,7 +42,7 @@ from brasa.commands import (  # noqa: E402, F811
 )
 
 # Keep references so linters don't flag unused imports.
-__all__ = ["detect", "diff", "exec", "flash", "repl", "restart", "serial"]
+__all__ = ["deploy", "detect", "diff", "exec", "flash", "repl", "restart", "serial"]
 
 
 def main() -> None:
