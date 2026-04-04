@@ -20,7 +20,7 @@ def mpremote_run(
     cmd = ["mpremote", "connect", port, *args]
     if capture:
         return subprocess.run(cmd, capture_output=True, text=True, check=True)
-    return subprocess.run(cmd, check=True)
+    return subprocess.run(cmd, text=True, check=True)
 
 
 def repl(port: str) -> None:
