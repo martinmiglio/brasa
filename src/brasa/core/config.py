@@ -12,8 +12,8 @@ from brasa.core.output import error
 class FirmwareConfig:
     """Firmware flashing settings."""
 
-    board: str = "ESP8266"
-    variant: str = "GENERIC"
+    board: str = "ESP8266_GENERIC"
+    variant: str = ""
     version: str = ""
     date: str = ""
 
@@ -89,6 +89,19 @@ def _find_config_file() -> tuple[Path | None, dict]:
             return pyproject_toml, brasa_section
 
     return None, {}
+
+
+def resolve_config_write_path() -> Path:
+    """Return the config file to write to.
+
+    Uses the same resolution as reading: ``brasa.toml`` first, then
+    ``pyproject.toml`` with ``[tool.brasa]``.  When neither has brasa
+    config, defaults to ``pyproject.toml`` in the current directory.
+    """
+    path, _ = _find_config_file()
+    if path is not None:
+        return path
+    return Path.cwd() / "pyproject.toml"
 
 
 def _parse_section[T](cls: type[T], raw: dict) -> T:

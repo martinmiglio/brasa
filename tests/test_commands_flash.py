@@ -23,7 +23,7 @@ runner = CliRunner()
     "brasa.commands.flash.require_config",
     return_value=BrasaConfig(
         firmware=FirmwareConfig(
-            board="ESP32", variant="GENERIC", version="1.23.0", date="2025-01-01"
+            board="ESP32_GENERIC", variant="", version="1.27.0", date="20251209"
         )
     ),
 )
@@ -41,12 +41,41 @@ def test_flash_command(
     mock_flash.assert_called_once_with("/dev/cu.test", Path("firmware/test.bin"))
 
 
+# ── flash shows deprecation warning ────────────────────────────────────────
+
+
+@patch("brasa.commands.flash.resolve_port", return_value="/dev/cu.test")
+@patch("brasa.commands.flash.port_lock", return_value=nullcontext())
+@patch("brasa.commands.flash.flash_firmware")
+@patch("brasa.commands.flash.download_firmware", return_value=Path("firmware/test.bin"))
+@patch(
+    "brasa.commands.flash.require_config",
+    return_value=BrasaConfig(
+        firmware=FirmwareConfig(
+            board="ESP32_GENERIC", variant="", version="1.27.0", date="20251209"
+        )
+    ),
+)
+def test_flash_shows_deprecation_warning(
+    mock_require: MagicMock,
+    mock_download: MagicMock,
+    mock_flash: MagicMock,
+    mock_lock: MagicMock,
+    mock_detect: MagicMock,
+) -> None:
+    result = runner.invoke(app, ["flash"])
+    assert result.exit_code == 0
+    assert "deprecated" in result.output.lower()
+
+
 # ── flash errors on missing version ─────────────────────────────────────────
 
 
 @patch(
     "brasa.commands.flash.require_config",
-    return_value=BrasaConfig(firmware=FirmwareConfig(board="ESP32", date="2025-01-01")),
+    return_value=BrasaConfig(
+        firmware=FirmwareConfig(board="ESP32_GENERIC", date="20251209")
+    ),
 )
 def test_flash_errors_missing_version(mock_require: MagicMock) -> None:
     result = runner.invoke(app, ["flash"])
@@ -58,7 +87,9 @@ def test_flash_errors_missing_version(mock_require: MagicMock) -> None:
 
 @patch(
     "brasa.commands.flash.require_config",
-    return_value=BrasaConfig(firmware=FirmwareConfig(board="ESP32", version="1.23.0")),
+    return_value=BrasaConfig(
+        firmware=FirmwareConfig(board="ESP32_GENERIC", version="1.27.0")
+    ),
 )
 def test_flash_errors_missing_date(mock_require: MagicMock) -> None:
     result = runner.invoke(app, ["flash"])

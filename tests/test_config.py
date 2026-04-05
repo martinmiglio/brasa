@@ -11,8 +11,10 @@ from brasa.core.config import (
     FirmwareConfig,
     PortConfig,
     SerialConfig,
+    _find_config_file,
     load_config,
     require_config,
+    resolve_config_write_path,
 )
 
 _FULL_BRASA_TOML = """\
@@ -91,15 +93,21 @@ def test_load_from_brasa_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     _assert_full_config(load_config())
 
 
-def test_load_from_pyproject_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_from_pyproject_toml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "pyproject.toml", _FULL_PYPROJECT_TOML)
     monkeypatch.chdir(tmp_path)
     _assert_full_config(load_config())
 
 
-def test_brasa_toml_takes_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_brasa_toml_takes_precedence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[firmware]\nboard = "FROM_BRASA"\n')
-    _write(tmp_path, "pyproject.toml", '[tool.brasa.firmware]\nboard = "FROM_PYPROJECT"\n')
+    _write(
+        tmp_path, "pyproject.toml", '[tool.brasa.firmware]\nboard = "FROM_PYPROJECT"\n'
+    )
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
     assert cfg.firmware.board == "FROM_BRASA"
@@ -108,13 +116,17 @@ def test_brasa_toml_takes_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyP
 # ── No config ───────────────────────────────────────────────────────────────
 
 
-def test_load_config_no_file_returns_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_no_file_returns_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
     assert cfg == BrasaConfig()
 
 
-def test_require_config_no_file_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_require_config_no_file_exits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     with pytest.raises(SystemExit, match="1"):
         require_config()
@@ -123,7 +135,9 @@ def test_require_config_no_file_exits(tmp_path: Path, monkeypatch: pytest.Monkey
 # ── Partial configs ─────────────────────────────────────────────────────────
 
 
-def test_partial_config_firmware_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_partial_config_firmware_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[firmware]\nboard = "RP2040"\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -133,7 +147,9 @@ def test_partial_config_firmware_only(tmp_path: Path, monkeypatch: pytest.Monkey
     assert cfg.port == PortConfig()
 
 
-def test_partial_config_deploy_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_partial_config_deploy_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[deploy]\nsrc = "lib"\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -144,7 +160,9 @@ def test_partial_config_deploy_only(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 # ── Tuple conversions ───────────────────────────────────────────────────────
 
 
-def test_boot_files_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_boot_files_converted_to_tuple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[deploy]\nboot_files = ["a.py", "b.py"]\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -152,7 +170,9 @@ def test_boot_files_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.Monke
     assert isinstance(cfg.deploy.boot_files, tuple)
 
 
-def test_patterns_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_patterns_converted_to_tuple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write(tmp_path, "brasa.toml", '[port]\npatterns = ["/dev/ttyUSB*"]\n')
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
@@ -165,8 +185,8 @@ def test_patterns_converted_to_tuple(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 def test_default_values() -> None:
     cfg = BrasaConfig()
-    assert cfg.firmware.board == "ESP8266"
-    assert cfg.firmware.variant == "GENERIC"
+    assert cfg.firmware.board == "ESP8266_GENERIC"
+    assert cfg.firmware.variant == ""
     assert cfg.firmware.version == ""
     assert cfg.firmware.date == ""
     assert cfg.deploy.src == "src"
@@ -206,3 +226,87 @@ def test_unknown_keys_ignored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.chdir(tmp_path)
     cfg = load_config()
     assert cfg.firmware.board == "ESP32"
+
+
+# ── resolve_config_write_path ────────────────────────────────────────────────
+
+
+def test_write_path_returns_brasa_toml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path, "brasa.toml", '[firmware]\nboard = "ESP32"\n')
+    monkeypatch.chdir(tmp_path)
+    assert resolve_config_write_path() == tmp_path / "brasa.toml"
+
+
+def test_write_path_returns_pyproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path, "pyproject.toml", '[tool.brasa.firmware]\nboard = "ESP32"\n')
+    monkeypatch.chdir(tmp_path)
+    assert resolve_config_write_path() == tmp_path / "pyproject.toml"
+
+
+def test_write_path_defaults_to_pyproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When no config exists, write defaults to pyproject.toml."""
+    monkeypatch.chdir(tmp_path)
+    assert resolve_config_write_path() == tmp_path / "pyproject.toml"
+
+
+def test_write_path_brasa_toml_takes_precedence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path, "brasa.toml", '[firmware]\nboard = "FROM_BRASA"\n')
+    _write(
+        tmp_path, "pyproject.toml", '[tool.brasa.firmware]\nboard = "FROM_PYPROJECT"\n'
+    )
+    monkeypatch.chdir(tmp_path)
+    assert resolve_config_write_path() == tmp_path / "brasa.toml"
+
+
+# ── read/write resolution consistency ────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "scenario,files",
+    [
+        ("brasa_toml", {"brasa.toml": '[firmware]\nboard = "ESP32"\n'}),
+        (
+            "pyproject",
+            {"pyproject.toml": '[tool.brasa.firmware]\nboard = "ESP32"\n'},
+        ),
+        (
+            "both",
+            {
+                "brasa.toml": '[firmware]\nboard = "ESP32"\n',
+                "pyproject.toml": '[tool.brasa.firmware]\nboard = "ESP32"\n',
+            },
+        ),
+    ],
+)
+def test_read_and_write_resolve_to_same_file(
+    scenario: str,
+    files: dict[str, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Write resolution matches read resolution when config exists."""
+    for name, content in files.items():
+        _write(tmp_path, name, content)
+    monkeypatch.chdir(tmp_path)
+    read_path, _ = _find_config_file()
+    write_path = resolve_config_write_path()
+    assert read_path == write_path
+
+
+def test_no_config_write_defaults_read_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When no config exists: read returns None, write defaults to pyproject.toml."""
+    monkeypatch.chdir(tmp_path)
+    read_path, _ = _find_config_file()
+    write_path = resolve_config_write_path()
+    assert read_path is None
+    assert write_path == tmp_path / "pyproject.toml"

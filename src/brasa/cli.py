@@ -46,6 +46,9 @@ from brasa.commands import (  # noqa: E402, F811
     restart,
     serial,
 )
+from brasa.commands.firmware import firmware_app  # noqa: E402
+
+app.add_typer(firmware_app, name="firmware")
 
 # Keep references so linters don't flag unused imports.
 __all__ = [
@@ -54,6 +57,7 @@ __all__ = [
     "dev",
     "diff",
     "exec",
+    "firmware_app",
     "flash",
     "repl",
     "restart",

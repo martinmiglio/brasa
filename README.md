@@ -13,7 +13,7 @@ pip install brasa
 ```
 brasa dev            # deploy, watch for changes, stream serial
 brasa deploy         # compile & push src/ to device
-brasa flash          # download firmware + flash device
+brasa firmware       # manage firmware (list, download, install, select, show)
 brasa serial         # read-only serial monitor
 brasa repl           # interactive REPL
 brasa diff           # diff local src/ vs device files
@@ -24,14 +24,29 @@ brasa restart        # reboot device
 
 All commands auto-detect the serial port. Override with `--port /dev/cu.xxx`.
 
+### Firmware management
+
+```
+brasa firmware list [BOARD]          # list available versions for a board
+brasa firmware download              # download firmware to local cache
+brasa firmware install               # download + flash + save to config
+brasa firmware install --from-config # install the version pinned in config
+brasa firmware select                # pick a version and save to config (no flash)
+brasa firmware show                  # show firmware version on connected device
+```
+
+Board, variant, and version can be passed as flags (`--board`, `--variant`, `--version`) or selected interactively. When a device is connected, the board is auto-detected. Values already in config are used as defaults.
+
+> **Note:** `brasa flash` is deprecated in favor of `brasa firmware install --from-config`.
+
 ## Configuration
 
-Create a `brasa.toml` in your project root (or add `[tool.brasa]` to `pyproject.toml`):
+Create a `brasa.toml` in your project root (or add `[tool.brasa.*]` sections to `pyproject.toml`):
 
 ```toml
 [firmware]
-board = "ESP8266"
-variant = "GENERIC-FLASH_2M_ROMFS"
+board = "ESP8266_GENERIC"
+variant = ""
 version = "1.27.0"
 date = "20251209"
 
@@ -62,9 +77,9 @@ date = "20251209"
 ## Workflow
 
 ```bash
-brasa flash          # flash firmware (first time or update)
-brasa dev            # deploy + watch + serial monitor (daily development)
-brasa diff           # check what's different on device
+brasa firmware install   # flash firmware (first time or update)
+brasa dev                # deploy + watch + serial monitor (daily development)
+brasa diff               # check what's different on device (ROMFS-aware)
 ```
 
 ## Why
