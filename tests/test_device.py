@@ -110,20 +110,20 @@ def test_fs_ls(fp: pytest.fixture) -> None:
     assert fs_ls(PORT, "/") == "main.py\nlib/\n"
 
 
-@patch("brasa.core.device.serial.Serial")
+@patch("brasa.core.device.pyserial.Serial")
 def test_dtr_reset(mock_serial_cls: MagicMock) -> None:
     """dtr_reset() toggles DTR on the serial port."""
     mock_ser = MagicMock()
-    mock_serial_cls.return_value = mock_ser
+    mock_serial_cls.return_value.__enter__ = MagicMock(return_value=mock_ser)
+    mock_serial_cls.return_value.__exit__ = MagicMock(return_value=False)
 
     dtr_reset(PORT)
 
     mock_serial_cls.assert_called_once_with(PORT)
     assert mock_ser.dtr is True  # last assignment
-    mock_ser.close.assert_called_once()
 
 
-@patch("brasa.core.device.serial.Serial", side_effect=OSError("no port"))
+@patch("brasa.core.device.pyserial.Serial", side_effect=OSError("no port"))
 def test_dtr_reset_catches_exceptions(mock_serial_cls: MagicMock) -> None:
     """dtr_reset() catches exceptions gracefully."""
     dtr_reset(PORT)  # should not raise

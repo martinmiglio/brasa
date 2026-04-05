@@ -3,7 +3,7 @@
 import subprocess
 import time
 
-import serial
+import serial as pyserial
 
 from brasa.core.output import warn
 
@@ -97,10 +97,9 @@ def dtr_reset(port: str) -> None:
     Failures are logged but tolerated — the device may not support DTR reset.
     """
     try:
-        ser = serial.Serial(port)
-        ser.dtr = False
-        time.sleep(0.1)
-        ser.dtr = True
-        ser.close()
-    except (serial.SerialException, OSError) as exc:
+        with pyserial.Serial(port) as ser:
+            ser.dtr = False
+            time.sleep(0.1)
+            ser.dtr = True
+    except (pyserial.SerialException, OSError) as exc:
         warn(f"DTR reset failed on {port}: {exc}")

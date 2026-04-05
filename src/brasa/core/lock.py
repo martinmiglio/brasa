@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from brasa.core.output import error, status, warn
 from brasa.core.port import resolve_port
 
-_ENV_KEY = "BRASA_PORT_LOCKED"
+ENV_PORT_LOCKED = "BRASA_PORT_LOCKED"
 _LOCK_DIR = tempfile.gettempdir()
 
 
@@ -29,13 +29,13 @@ def port_lock(port: str, caller: str) -> Generator[None, None, None]:
     skipped (reentrant).
     """
     # Reentrant — an outer command already holds the lock.
-    if os.environ.get(_ENV_KEY) == port:
+    if os.environ.get(ENV_PORT_LOCKED) == port:
         yield
         return
 
     path = _lock_path(port)
     fd: int | None = None
-    prev_env = os.environ.get(_ENV_KEY)
+    prev_env = os.environ.get(ENV_PORT_LOCKED)
 
     try:
         fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
@@ -71,7 +71,7 @@ def port_lock(port: str, caller: str) -> Generator[None, None, None]:
         meta = json.dumps({"pid": os.getpid(), "caller": caller})
         os.write(fd, meta.encode())
 
-        os.environ[_ENV_KEY] = port
+        os.environ[ENV_PORT_LOCKED] = port
         status("lock", f"{port} acquired by '{caller}'")
 
         yield
@@ -82,9 +82,9 @@ def port_lock(port: str, caller: str) -> Generator[None, None, None]:
     finally:
         # Restore env.
         if prev_env is None:
-            os.environ.pop(_ENV_KEY, None)
+            os.environ.pop(ENV_PORT_LOCKED, None)
         else:
-            os.environ[_ENV_KEY] = prev_env
+            os.environ[ENV_PORT_LOCKED] = prev_env
 
         # Release the lock.
         if fd is not None:
