@@ -102,12 +102,16 @@ class TestContention:
     ) -> None:
         original_flock = fcntl.flock
         calls: list[int] = []
+        nb_attempts = 0
 
         def flock_contention(fd: int, op: int) -> None:
+            nonlocal nb_attempts
             calls.append(op)
             if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):
-                raise BlockingIOError("locked by another process")
-            # Blocking call succeeds.
+                nb_attempts += 1
+                if nb_attempts <= 2:
+                    raise BlockingIOError("locked by another process")
+            # Third NB attempt (or unlock) succeeds.
             original_flock(fd, op)
 
         monkeypatch.setattr("fcntl.flock", flock_contention)
@@ -115,6 +119,6 @@ class TestContention:
         with port_lock(PORT, CALLER):
             pass
 
-        # First call: non-blocking attempt, second: blocking wait, third: unlock.
+        # First two NB attempts fail, third succeeds, then unlock.
         assert calls[0] == fcntl.LOCK_EX | fcntl.LOCK_NB
-        assert calls[1] == fcntl.LOCK_EX
+        assert nb_attempts >= 2
