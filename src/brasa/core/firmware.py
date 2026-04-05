@@ -50,11 +50,6 @@ def _download_file(url: str, dest: Path) -> Path:
     output.status("firmware", f"downloading {url}")
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    brasa_dir = path.parent.parent  # .brasa/
-    gitignore = brasa_dir / ".gitignore"
-    if not gitignore.exists():
-        gitignore.write_text("*\n")
-
     with httpx.stream("GET", url, follow_redirects=True) as response:
         response.raise_for_status()
         total = int(response.headers.get("content-length", 0))
