@@ -175,7 +175,7 @@ def diff_files(port: str, cfg: DeployConfig) -> list[FileDiff]:
 def print_diff(diffs: list[FileDiff]) -> None:
     """Print colored diff output to stderr."""
     if not diffs:
-        success("Device is up to date")
+        success("device is up to date")
         return
 
     modified = 0

@@ -12,7 +12,7 @@ import watchfiles
 from brasa.core.config import BrasaConfig, require_config
 from brasa.core.deploy import deploy
 from brasa.core.device import dtr_reset
-from brasa.core.lock import resolved_port_lock
+from brasa.core.lock import ENV_PORT_LOCKED, resolved_port_lock
 from brasa.core.output import error, status, success, warn
 from brasa.core.serial import SerialReader
 
@@ -30,7 +30,7 @@ def dev(ctx: typer.Context) -> None:
     with resolved_port_lock(
         ctx.obj.get("port"), "dev", patterns=cfg.port.patterns
     ) as port:
-        os.environ["BRASA_PORT_LOCKED"] = port
+        os.environ[ENV_PORT_LOCKED] = port
 
         if isinstance(sys.stdout, io.TextIOWrapper):
             sys.stdout.reconfigure(line_buffering=True)

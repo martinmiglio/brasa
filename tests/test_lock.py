@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from brasa.core.lock import _ENV_KEY, _lock_path, port_lock, resolved_port_lock
+from brasa.core.lock import ENV_PORT_LOCKED, _lock_path, port_lock, resolved_port_lock
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +18,7 @@ def _use_tmp_path_for_locks(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure BRASA_PORT_LOCKED is unset before each test."""
-    monkeypatch.delenv(_ENV_KEY, raising=False)
+    monkeypatch.delenv(ENV_PORT_LOCKED, raising=False)
 
 
 PORT = "/dev/cu.usbmodem1234"
@@ -43,28 +43,28 @@ class TestPortLockHappyPath:
 
     def test_env_var_set_inside_context(self) -> None:
         with port_lock(PORT, CALLER):
-            assert os.environ.get(_ENV_KEY) == PORT
+            assert os.environ.get(ENV_PORT_LOCKED) == PORT
 
     def test_env_var_restored_after_context(self) -> None:
         with port_lock(PORT, CALLER):
             pass
-        assert os.environ.get(_ENV_KEY) is None
+        assert os.environ.get(ENV_PORT_LOCKED) is None
 
 
 class TestReentrant:
     """When BRASA_PORT_LOCKED is already set to the port, skip locking."""
 
     def test_reentrant_skips_lock(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(_ENV_KEY, PORT)
+        monkeypatch.setenv(ENV_PORT_LOCKED, PORT)
         # Should not raise or attempt to acquire — just yield.
         with port_lock(PORT, CALLER):
             # Env var should still be present (unchanged).
-            assert os.environ[_ENV_KEY] == PORT
+            assert os.environ[ENV_PORT_LOCKED] == PORT
 
     def test_reentrant_no_lock_file_created(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv(_ENV_KEY, PORT)
+        monkeypatch.setenv(ENV_PORT_LOCKED, PORT)
         with port_lock(PORT, CALLER):
             assert not os.path.exists(_lock_path(PORT))
 
@@ -133,7 +133,7 @@ class TestResolvedPortLock:
         )
         with resolved_port_lock(None, CALLER) as port:
             assert port == PORT
-            assert os.environ.get(_ENV_KEY) == PORT
+            assert os.environ.get(ENV_PORT_LOCKED) == PORT
 
     def test_passes_override_to_resolve(self, monkeypatch: pytest.MonkeyPatch) -> None:
         received: list[tuple[str | None, object]] = []
