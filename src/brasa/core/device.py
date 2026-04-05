@@ -75,6 +75,22 @@ def detect_board(port: str) -> str | None:
         return None
 
 
+def device_firmware_info(port: str) -> dict[str, str]:
+    """Query the device for platform and firmware version.
+
+    Returns a dict with ``platform``, ``board``, and ``version`` keys.
+    """
+    raw = exec_expr(
+        port,
+        "import sys; print(sys.platform); v=sys.implementation.version; print(f'{v[0]}.{v[1]}.{v[2]}')",
+    ).strip()
+    lines = raw.splitlines()
+    platform = lines[0] if lines else ""
+    version = lines[1] if len(lines) > 1 else ""
+    board = _PLATFORM_TO_BOARD.get(platform, platform)
+    return {"platform": platform, "board": board, "version": version}
+
+
 def dtr_reset(port: str) -> None:
     """Toggle DTR to perform a hardware reset.
 

@@ -8,7 +8,7 @@ import typer
 
 from brasa.core import output
 from brasa.core.config import BrasaConfig, load_config, require_config
-from brasa.core.device import detect_board
+from brasa.core.device import detect_board, device_firmware_info
 from brasa.core.firmware import (
     download_entry,
     install_firmware,
@@ -253,7 +253,26 @@ def select(
     variant: str | None = typer.Option(None, "--variant", help="Board variant"),
     version: str | None = typer.Option(None, "--version", help="Firmware version"),
 ) -> None:
-    """Select a firmware version and save to brasa.toml (no flash)."""
+    """Select a firmware version and save to config (no flash)."""
     entry = _resolve_entry(board, variant, version, use_config=False)
     path = write_pin(entry.board, entry.variant, entry.version, entry.date)
     output.success(f"firmware saved to {path}")
+
+
+@firmware_app.command()
+def show(
+    ctx: typer.Context,
+    json: bool = typer.Option(False, "--json", help="Output as JSON"),
+) -> None:
+    """Show the firmware version running on the connected device."""
+    import json as json_mod
+
+    port_flag = ctx.obj.get("port") if ctx.obj else None
+    port = resolve_port(port_flag)
+    with port_lock(port, "firmware show"):
+        info = device_firmware_info(port)
+
+    if json:
+        output.print_stdout(json_mod.dumps(info))
+    else:
+        output.status("firmware", f"device: {info['board']} v{info['version']}")
