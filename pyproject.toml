@@ -30,6 +30,7 @@ dev = [
     "pytest-cov",
     "pytest-timeout",
     "pre-commit>=4.5.1",
+    "freezegun>=1.5.5",
 ]
 
 [tool.ruff]
