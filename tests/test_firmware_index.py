@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -14,7 +15,6 @@ from brasa.core.firmware_index import (
     BoardInfo,
     FirmwareEntry,
     _BoardLinkParser,
-    _FirmwareLinkParser,
     _is_fresh,
     _parse_firmware_href,
     cache_dir,
@@ -42,16 +42,15 @@ _SAMPLE_HTML = """
 """
 
 
-def test_parser_extracts_firmware_hrefs() -> None:
-    parser = _FirmwareLinkParser()
-    parser.feed(_SAMPLE_HTML)
-    assert len(parser.hrefs) == 6  # 4 .bin + 1 .elf + 1 .map
+def test_regex_extracts_firmware_hrefs() -> None:
+    hrefs = re.findall(r'href="([^"]*?/resources/firmware/[^"]*)"', _SAMPLE_HTML)
+    assert len(hrefs) == 6  # 4 .bin + 1 .elf + 1 .map
 
 
-def test_parser_ignores_non_firmware_links() -> None:
-    parser = _FirmwareLinkParser()
-    parser.feed('<a href="https://github.com">GH</a><a href="/download/">dl</a>')
-    assert parser.hrefs == []
+def test_regex_ignores_non_firmware_links() -> None:
+    html = '<a href="https://github.com">GH</a><a href="/download/">dl</a>'
+    hrefs = re.findall(r'href="([^"]*?/resources/firmware/[^"]*)"', html)
+    assert hrefs == []
 
 
 # ── _parse_firmware_href ────────────────────────────────────────────────────
@@ -366,3 +365,34 @@ def test_corrupted_board_list_cache_triggers_rescrape(
     mock_scrape.assert_called_once()
     assert len(result) == 2
     assert result[0].id == "ESP32_GENERIC"
+
+
+# ── Empty-result guard ─────────────────────────────────────────────────────
+
+
+@patch("brasa.core.firmware_index._scrape_board_page", return_value=[])
+def test_empty_scrape_skips_cache_write(
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    cache_file = tmp_path / "ESP32_GENERIC.index.json"
+
+    result = fetch_board_index("ESP32_GENERIC")
+
+    mock_scrape.assert_called_once()
+    assert len(result.entries) == 0
+    assert not cache_file.exists()
+
+
+@patch("brasa.core.firmware_index._scrape_board_list", return_value=[])
+def test_empty_board_list_scrape_skips_cache_write(
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    cache_file = tmp_path / "boards.json"
+
+    result = fetch_board_list()
+
+    mock_scrape.assert_called_once()
+    assert result == []
+    assert not cache_file.exists()
