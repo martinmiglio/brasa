@@ -211,7 +211,8 @@ def fetch_board_index(board: str, *, force_refresh: bool = False) -> BoardIndex:
         label=f"index for {board}",
         force_refresh=force_refresh,
     )
-    return BoardIndex(board=board, entries=tuple(entries), fetched_at=time.time())
+    fetched_at = path.stat().st_mtime if path.exists() else time.time()
+    return BoardIndex(board=board, entries=tuple(entries), fetched_at=fetched_at)
 
 
 def list_variants(index: BoardIndex) -> list[str]:
