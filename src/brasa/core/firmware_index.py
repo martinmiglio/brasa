@@ -6,14 +6,18 @@ import json
 import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import TypeVar
 
 import httpx
 
 from brasa.core import output
 from brasa.core.firmware_resolver import firmware_ext, firmware_filename
+
+_T = TypeVar("_T")
 
 _BASE_URL = "https://micropython.org"
 _INDEX_TTL = 3600  # 1 hour
@@ -68,21 +72,6 @@ class BoardIndex:
     board: str
     entries: tuple[FirmwareEntry, ...]
     fetched_at: float
-
-
-class _FirmwareLinkParser(HTMLParser):
-    """Extract firmware download hrefs from a micropython.org board page."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.hrefs: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag != "a":
-            return
-        for name, value in attrs:
-            if name == "href" and value and "/resources/firmware/" in value:
-                self.hrefs.append(value)
 
 
 def cache_dir() -> Path:
@@ -151,12 +140,11 @@ def _scrape_board_page(board: str) -> list[FirmwareEntry]:
         output.error(f"failed to fetch firmware index: HTTP {exc.response.status_code}")
         raise SystemExit(1)
 
-    parser = _FirmwareLinkParser()
-    parser.feed(response.text)
+    hrefs = re.findall(r'href="([^"]*?/resources/firmware/[^"]*)"', response.text)
 
     entries: list[FirmwareEntry] = []
     seen: set[str] = set()
-    for href in parser.hrefs:
+    for href in hrefs:
         entry = _parse_firmware_href(href, board)
         if entry and entry.filename not in seen:
             seen.add(entry.filename)
@@ -164,11 +152,36 @@ def _scrape_board_page(board: str) -> list[FirmwareEntry]:
     return entries
 
 
-def _save_index(board: str, entries: list[FirmwareEntry]) -> BoardIndex:
+def _cached_fetch(
+    path: Path,
+    scrape_fn: Callable[[], _T],
+    load_fn: Callable[[Path], _T],
+    save_fn: Callable[[Path, _T], None],
+    label: str,
+    *,
+    force_refresh: bool = False,
+) -> _T:
+    """Generic cache-or-scrape helper used by board index and board list fetchers."""
+    if not force_refresh and _is_fresh(path):
+        output.status("firmware", f"using cached {label}")
+        try:
+            return load_fn(path)
+        except (json.JSONDecodeError, KeyError):
+            output.warn(f"corrupted cache for {label}, re-fetching")
+            path.unlink(missing_ok=True)
+
+    data = scrape_fn()
+    if not data:
+        output.warn(f"scrape returned no results for {label} — skipping cache write")
+        return data
+    save_fn(path, data)
+    return data
+
+
+def _save_board_index(path: Path, entries: list[FirmwareEntry]) -> None:
     """Save a board index to the JSON cache."""
+    board = entries[0].board
     now = time.time()
-    index = BoardIndex(board=board, entries=tuple(entries), fetched_at=now)
-    path = _index_path(board)
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
         "board": board,
@@ -179,33 +192,26 @@ def _save_index(board: str, entries: list[FirmwareEntry]) -> BoardIndex:
         path.write_text(json.dumps(data, indent=2))
     except OSError as exc:
         output.warn(f"could not cache firmware index: {exc}")
-    return index
 
 
-def _load_index(board: str) -> BoardIndex:
-    """Load a board index from the JSON cache."""
-    path = _index_path(board)
-    try:
-        data = json.loads(path.read_text())
-    except json.JSONDecodeError:
-        output.warn(f"corrupted cache for {board}, re-fetching")
-        path.unlink(missing_ok=True)
-        entries = _scrape_board_page(board)
-        return _save_index(board, entries)
-    entries = tuple(FirmwareEntry(**e) for e in data["entries"])
-    return BoardIndex(
-        board=data["board"], entries=entries, fetched_at=data["fetched_at"]
-    )
+def _load_board_index(path: Path) -> list[FirmwareEntry]:
+    """Load a board index from the JSON cache and return the entry list."""
+    data = json.loads(path.read_text())
+    return [FirmwareEntry(**e) for e in data["entries"]]
 
 
 def fetch_board_index(board: str, *, force_refresh: bool = False) -> BoardIndex:
     """Return firmware entries for a board, using cache when fresh."""
     path = _index_path(board)
-    if not force_refresh and _is_fresh(path):
-        output.status("firmware", f"using cached index for {board}")
-        return _load_index(board)
-    entries = _scrape_board_page(board)
-    return _save_index(board, entries)
+    entries = _cached_fetch(
+        path,
+        scrape_fn=lambda: _scrape_board_page(board),
+        load_fn=_load_board_index,
+        save_fn=_save_board_index,
+        label=f"index for {board}",
+        force_refresh=force_refresh,
+    )
+    return BoardIndex(board=board, entries=tuple(entries), fetched_at=time.time())
 
 
 def list_variants(index: BoardIndex) -> list[str]:
@@ -331,20 +337,14 @@ def _scrape_board_list() -> list[BoardInfo]:
     return boards
 
 
-def fetch_board_list(*, force_refresh: bool = False) -> list[BoardInfo]:
-    """Return all available boards, using cache when fresh."""
-    path = _board_list_path()
-    if not force_refresh and _is_fresh(path):
-        output.status("firmware", "using cached board list")
-        try:
-            data = json.loads(path.read_text())
-        except json.JSONDecodeError:
-            output.warn("corrupted board list cache, re-fetching")
-            path.unlink(missing_ok=True)
-        else:
-            return [BoardInfo(**b) for b in data["boards"]]
+def _load_board_list(path: Path) -> list[BoardInfo]:
+    """Load board list from the JSON cache."""
+    data = json.loads(path.read_text())
+    return [BoardInfo(**b) for b in data["boards"]]
 
-    boards = _scrape_board_list()
+
+def _save_board_list(path: Path, boards: list[BoardInfo]) -> None:
+    """Save board list to the JSON cache."""
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
         "fetched_at": time.time(),
@@ -354,4 +354,16 @@ def fetch_board_list(*, force_refresh: bool = False) -> list[BoardInfo]:
         path.write_text(json.dumps(data, indent=2))
     except OSError as exc:
         output.warn(f"could not cache board list: {exc}")
-    return boards
+
+
+def fetch_board_list(*, force_refresh: bool = False) -> list[BoardInfo]:
+    """Return all available boards, using cache when fresh."""
+    path = _board_list_path()
+    return _cached_fetch(
+        path,
+        scrape_fn=_scrape_board_list,
+        load_fn=_load_board_list,
+        save_fn=_save_board_list,
+        label="board list",
+        force_refresh=force_refresh,
+    )
