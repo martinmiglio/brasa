@@ -7,9 +7,9 @@ CLI tool that replaces the bespoke Makefile + scripts every MicroPython project 
 ## Architecture
 
 - **CLI framework**: Typer (Click-based, type-hint driven). Entry point: `src/brasa/cli.py`
-- **`src/brasa/commands/`**: One module per CLI command (`detect`, `serial`, `repl`, `flash`, `deploy`, `dev`, `diff`, `exec`, `restart`)
-- **`src/brasa/core/`**: Domain logic — port detection, serial port locking (`fcntl.flock`), serial reader, device operations, firmware download, terminal output helpers
-- **Config**: `brasa.toml` in consumer project root (or `[tool.brasa]` in their `pyproject.toml`)
+- **`src/brasa/commands/`**: One module per CLI command (`detect`, `serial`, `repl`, `flash`, `deploy`, `dev`, `diff`, `exec`, `restart`) plus the `firmware` subcommand group (`list`, `download`, `install`, `select`, `show`)
+- **`src/brasa/core/`**: Domain logic — port detection, serial port locking (`fcntl.flock`), serial reader, device operations, firmware index & download, TOML config writer, terminal output helpers
+- **Config**: `brasa.toml` in consumer project root (or `[tool.brasa.*]` in their `pyproject.toml`). Config write-back (e.g. `firmware select`) resolves to the existing config file, defaulting to `pyproject.toml`.
 
 ## Build & run
 
