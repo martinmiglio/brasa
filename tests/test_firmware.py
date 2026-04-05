@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 from brasa.core.config import FirmwareConfig
 from brasa.core.firmware import (
-    _firmware_ext,
     download_firmware,
     firmware_cache_path,
     firmware_url,
@@ -13,18 +12,19 @@ from brasa.core.firmware import (
     install_uf2,
     platform_for_board,
 )
+from brasa.core.firmware_resolver import firmware_ext
 
-# ── _firmware_ext ──────────────────────────────────────────────────────────
+# ── firmware_ext ──────────────────────────────────────────────────────────
 
 
 def test_firmware_ext_esp() -> None:
-    assert _firmware_ext("ESP32_GENERIC") == "bin"
-    assert _firmware_ext("ESP8266_GENERIC") == "bin"
+    assert firmware_ext("ESP32_GENERIC") == "bin"
+    assert firmware_ext("ESP8266_GENERIC") == "bin"
 
 
 def test_firmware_ext_rp2() -> None:
-    assert _firmware_ext("RPI_PICO") == "uf2"
-    assert _firmware_ext("RPI_PICO2") == "uf2"
+    assert firmware_ext("RPI_PICO") == "uf2"
+    assert firmware_ext("RPI_PICO2") == "uf2"
 
 
 # ── platform_for_board ─────────────────────────────────────────────────────

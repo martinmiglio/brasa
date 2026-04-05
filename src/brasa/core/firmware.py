@@ -11,24 +11,14 @@ import httpx
 from brasa.core import output
 from brasa.core.config import FirmwareConfig
 from brasa.core.firmware_index import FirmwareEntry, cache_dir
+from brasa.core.firmware_resolver import firmware_ext, firmware_filename
 
 _BASE_URL = "https://micropython.org/resources/firmware"
 
 
-def _firmware_ext(board: str) -> str:
-    """Infer firmware file extension from board name."""
-    upper = board.upper()
-    if any(prefix in upper for prefix in ("RPI_PICO", "RP2", "ARDUINO_NANO_RP")):
-        return "uf2"
-    return "bin"
-
-
 def _firmware_filename(cfg: FirmwareConfig) -> str:
     """Build the firmware binary filename from config."""
-    ext = _firmware_ext(cfg.board)
-    if cfg.variant:
-        return f"{cfg.board}-{cfg.variant}-{cfg.date}-v{cfg.version}.{ext}"
-    return f"{cfg.board}-{cfg.date}-v{cfg.version}.{ext}"
+    return firmware_filename(cfg.board, cfg.variant, cfg.version, cfg.date)
 
 
 def firmware_url(cfg: FirmwareConfig) -> str:
@@ -147,6 +137,6 @@ def install_firmware(
 
 def platform_for_board(board: str) -> str:
     """Infer the flash platform from the board name."""
-    if _firmware_ext(board) == "uf2":
+    if firmware_ext(board) == "uf2":
         return "uf2"
     return "esp"
