@@ -3,9 +3,8 @@
 import typer
 
 from brasa.core.device import reset
-from brasa.core.lock import port_lock
+from brasa.core.lock import resolved_port_lock
 from brasa.core.output import success
-from brasa.core.port import resolve_port
 
 app = typer.Typer()
 
@@ -13,7 +12,6 @@ app = typer.Typer()
 @app.command()
 def restart(ctx: typer.Context) -> None:
     """Reboot the MicroPython device."""
-    port = resolve_port(ctx.obj.get("port"))
-    with port_lock(port, "restart"):
+    with resolved_port_lock(ctx.obj.get("port"), "restart") as port:
         reset(port)
         success("device restarted")

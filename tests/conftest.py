@@ -1,6 +1,8 @@
 """Shared test fixtures for brasa."""
 
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -28,3 +30,11 @@ def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "main.py").write_text("# main")
     monkeypatch.chdir(tmp_path)
     return tmp_path
+
+
+@contextmanager
+def fake_port_lock(
+    port_override: str | None, caller: str, patterns: object = None
+) -> Generator[str, None, None]:
+    """Stand-in for resolved_port_lock that skips real locking."""
+    yield port_override or "/dev/cu.test"

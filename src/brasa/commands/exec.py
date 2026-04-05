@@ -3,9 +3,8 @@
 import typer
 
 from brasa.core.device import exec_expr
-from brasa.core.lock import port_lock
+from brasa.core.lock import resolved_port_lock
 from brasa.core.output import print_stdout
-from brasa.core.port import resolve_port
 
 app = typer.Typer()
 
@@ -16,8 +15,7 @@ def exec_cmd(
     expression: str = typer.Argument(help="Python expression to execute on device"),
 ) -> None:
     """Execute a Python expression on the device."""
-    port = resolve_port(ctx.obj.get("port"))
-    with port_lock(port, "exec"):
+    with resolved_port_lock(ctx.obj.get("port"), "exec") as port:
         result = exec_expr(port, expression)
         if result:
             print_stdout(result)
