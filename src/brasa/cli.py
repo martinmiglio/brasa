@@ -1,17 +1,25 @@
+"""brasa CLI — MicroPython developer tools."""
+
 from importlib.metadata import version
 
 import typer
+
+from brasa.commands.deploy import app as deploy_app
+from brasa.commands.detect import app as detect_app
+from brasa.commands.dev import app as dev_app
+from brasa.commands.diff import app as diff_app
+from brasa.commands.exec import app as exec_app
+from brasa.commands.firmware import firmware_app
+from brasa.commands.flash import app as flash_app
+from brasa.commands.repl import app as repl_app
+from brasa.commands.restart import app as restart_app
+from brasa.commands.serial import app as serial_app
 
 app = typer.Typer(
     name="brasa",
     help="MicroPython developer tools — flash, deploy, watch, monitor.",
     no_args_is_help=True,
 )
-
-
-def port_override(ctx: typer.Context) -> str | None:
-    """Extract the ``--port`` override from the CLI context."""
-    return ctx.obj.get("port") if ctx.obj else None
 
 
 def _version_callback(value: bool) -> None:
@@ -34,35 +42,16 @@ def _main(
     ctx.obj["port"] = port
 
 
-# Register commands — imported after `app` is defined to avoid circular imports.
-from brasa.commands import (  # noqa: E402, F811
-    deploy,
-    detect,
-    dev,
-    diff,
-    exec,
-    flash,
-    repl,
-    restart,
-    serial,
-)
-from brasa.commands.firmware import firmware_app  # noqa: E402
-
+app.add_typer(deploy_app)
+app.add_typer(detect_app)
+app.add_typer(dev_app)
+app.add_typer(diff_app)
+app.add_typer(exec_app)
+app.add_typer(flash_app)
+app.add_typer(repl_app)
+app.add_typer(restart_app)
+app.add_typer(serial_app)
 app.add_typer(firmware_app, name="firmware")
-
-# Keep references so linters don't flag unused imports.
-__all__ = [
-    "deploy",
-    "detect",
-    "dev",
-    "diff",
-    "exec",
-    "firmware_app",
-    "flash",
-    "repl",
-    "restart",
-    "serial",
-]
 
 
 def main() -> None:
