@@ -4,10 +4,11 @@ import fcntl
 import json
 import os
 import tempfile
+import time
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from brasa.core.output import status, warn
+from brasa.core.output import error, status, warn
 
 _ENV_KEY = "BRASA_PORT_LOCKED"
 _LOCK_DIR = tempfile.gettempdir()
@@ -51,8 +52,17 @@ def port_lock(port: str, caller: str) -> Generator[None, None, None]:
             except (json.JSONDecodeError, OSError):
                 warn(f"port {port} locked by another process, waiting…")
 
-            # Block until the lock is released.
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            # Retry with timeout instead of blocking indefinitely.
+            deadline = time.monotonic() + 30.0
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        error(f"timed out waiting for port lock on {port}")
+                        raise SystemExit(1)
+                    time.sleep(0.5)
 
         # Write metadata so other waiters can report who holds the lock.
         os.ftruncate(fd, 0)

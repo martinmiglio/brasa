@@ -4,7 +4,7 @@ import threading
 
 import serial as pyserial
 
-from brasa.core.output import error, print_stdout, status
+from brasa.core.output import error, print_stdout, status, warn
 
 # Lines matching these prefixes are suppressed when filter_repl=True
 _REPL_NOISE = (">>>", "raw REPL; CTRL-B to exit", ">")
@@ -48,6 +48,7 @@ class SerialReader:
             return
 
         try:
+            consecutive_errors = 0
             while not self._stop_event.is_set():
                 # Handle pause
                 if not self._pause_event.is_set():
@@ -65,8 +66,13 @@ class SerialReader:
                 try:
                     raw = conn.readline()
                 except pyserial.SerialException as exc:
-                    error(f"serial read error: {exc}")
+                    consecutive_errors += 1
+                    if consecutive_errors >= 3:
+                        error(f"serial read failed {consecutive_errors} times, giving up: {exc}")
+                        break
                     continue
+
+                consecutive_errors = 0
 
                 if not raw:
                     continue
@@ -100,7 +106,8 @@ class SerialReader:
         self._paused_ack.clear()
         self._pause_event.clear()
         # Wait for the reader to actually release the port
-        self._paused_ack.wait(timeout=1.2)
+        if not self._paused_ack.wait(timeout=1.2):
+            warn("serial reader did not release port in time")
 
     def resume(self) -> None:
         """Resume reading after a pause."""
