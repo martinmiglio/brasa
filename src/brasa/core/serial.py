@@ -68,7 +68,9 @@ class SerialReader:
                 except pyserial.SerialException as exc:
                     consecutive_errors += 1
                     if consecutive_errors >= 3:
-                        error(f"serial read failed {consecutive_errors} times, giving up: {exc}")
+                        error(
+                            f"serial read failed {consecutive_errors} times, giving up: {exc}"
+                        )
                         break
                     continue
 

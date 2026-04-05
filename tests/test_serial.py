@@ -123,10 +123,7 @@ class TestSerialReader:
         def _readline() -> bytes:
             nonlocal call_count
             call_count += 1
-            if call_count == 1:
-                raise pyserial.SerialException("device disconnected")
-            time.sleep(0.05)
-            return b""
+            raise pyserial.SerialException("device disconnected")
 
         mock_conn.readline.side_effect = _readline
         mock_serial_cls.return_value = mock_conn
@@ -136,9 +133,9 @@ class TestSerialReader:
         time.sleep(0.3)
         reader.stop()
 
-        # Error should have been logged
+        # After 3 consecutive errors, error should be logged and loop exits
         mock_error.assert_called()
-        assert "serial read error" in mock_error.call_args[0][0]
+        assert "serial read failed" in mock_error.call_args[0][0]
 
     @patch("brasa.core.serial.pyserial.Serial")
     def test_start_background_creates_daemon_thread(
