@@ -8,13 +8,13 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "typer",
-    "pyserial",
-    "watchfiles",
-    "mpremote>=1.24.0",
-    "httpx",
-    "esptool",
-    "questionary",
+    "typer>=0.12.0,<1.0",
+    "pyserial>=3.5,<4.0",
+    "watchfiles>=0.24.0,<2.0",
+    "mpremote>=1.24.0,<2.0",
+    "httpx>=0.25.0,<0.30.0",
+    "esptool>=4.7.0,<6.0",
+    "questionary>=2.0.0,<3.0.0",
 ]
 
 [project.scripts]
