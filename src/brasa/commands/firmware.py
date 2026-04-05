@@ -243,8 +243,8 @@ def install(
         with port_lock(port, "firmware install"):
             install_firmware(firmware_path, port=port, platform="esp")
 
-    write_pin(entry.board, entry.variant, entry.version, entry.date)
-    output.success("firmware installed and saved to brasa.toml")
+    path = write_pin(entry.board, entry.variant, entry.version, entry.date)
+    output.success(f"firmware installed and saved to {path.name}")
 
 
 @firmware_app.command()
