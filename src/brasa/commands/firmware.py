@@ -20,9 +20,11 @@ from brasa.core.firmware_index import (
     fetch_board_index,
     fetch_board_list,
     find_entry,
+    find_entry_or_construct,
     list_variants,
     list_versions,
 )
+from brasa.core.firmware_resolver import fill_from_config
 from brasa.core.lock import port_lock
 from brasa.core.port import resolve_port
 from brasa.core.toml_writer import pin_firmware as write_pin
@@ -39,6 +41,13 @@ def _is_interactive() -> bool:
     return sys.stdin.isatty()
 
 
+def _require_interactive(flag_name: str) -> None:
+    """Exit with an error if not running in an interactive terminal."""
+    if not _is_interactive():
+        output.error(f"--{flag_name} is required when not running interactively")
+        raise SystemExit(1)
+
+
 # ── Board resolution ───────────────────────────────────────────────────────
 
 
@@ -49,7 +58,7 @@ def _resolve_board(
     use_config: bool = True,
     config: BrasaConfig | None = None,
 ) -> str:
-    """Resolve board from flag → config → device → interactive prompt."""
+    """Resolve board from flag -> config -> device -> interactive prompt."""
     if board:
         return board
 
@@ -74,6 +83,7 @@ def _resolve_board(
         pass
 
     # Interactive: fuzzy-searchable board list
+    _require_interactive("board")
     boards = fetch_board_list()
     board_ids = [b.id for b in boards]
     meta = {b.id: b.name for b in boards}
@@ -99,6 +109,7 @@ def _prompt_variant(index: BoardIndex) -> str:
         label = chosen if chosen else "(default)"
         output.status("firmware", f"auto-selected variant: {label}")
         return chosen
+    _require_interactive("variant")
     labels = [v if v else "(default)" for v in variants]
     choice = questionary.select("Variant:", choices=labels).ask()
     if choice is None:
@@ -112,6 +123,7 @@ def _prompt_version(index: BoardIndex, variant: str) -> str:
     if not versions:
         output.error(f"no stable versions found for variant '{variant}'")
         raise SystemExit(1)
+    _require_interactive("version")
     choice = questionary.select("Version:", choices=versions).ask()
     if choice is None:
         raise SystemExit(1)
@@ -139,24 +151,19 @@ def _resolve_entry(
             output.error("firmware.version is required in config for --from-config")
             raise SystemExit(1)
         index = fetch_board_index(fw.board, force_refresh=refresh)
-        entry = find_entry(index, fw.variant, fw.version)
-        if entry:
-            return entry
-        # Fall back: construct entry from config (may not be in index for older versions)
-        return FirmwareEntry.from_config(fw.board, fw.variant, fw.version, fw.date)
+        return find_entry_or_construct(index, fw.board, fw.variant, fw.version, fw.date)
 
     cfg = load_config() if use_config else None
     resolved_board = _resolve_board(board, port=port, use_config=use_config, config=cfg)
 
     # Fill variant/version from config if not given via CLI flags
     if cfg and (variant is None or version is None):
-        if cfg.firmware.board == resolved_board:
-            if variant is None and cfg.firmware.variant:
-                variant = cfg.firmware.variant
-                output.status("firmware", f"using variant from config: {variant}")
-            if version is None and cfg.firmware.version:
-                version = cfg.firmware.version
-                output.status("firmware", f"using version from config: {version}")
+        prev_variant, prev_version = variant, version
+        variant, version = fill_from_config(cfg, resolved_board, variant, version)
+        if variant is not None and prev_variant is None:
+            output.status("firmware", f"using variant from config: {variant}")
+        if version is not None and prev_version is None:
+            output.status("firmware", f"using version from config: {version}")
 
     index = fetch_board_index(resolved_board, force_refresh=refresh)
 

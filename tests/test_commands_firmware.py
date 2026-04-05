@@ -56,14 +56,20 @@ class TestResolveBoard:
         # With use_config=False and no device, should fall through to interactive.
         # Mock device detection to return something so we don't hit questionary.
         with patch("brasa.commands.firmware.resolve_port", return_value="/dev/test"):
-            with patch("brasa.commands.firmware.detect_board", return_value="RPI_PICO"):
+            with patch(
+                "brasa.commands.firmware.detect_board",
+                return_value="RPI_PICO",
+            ):
                 with patch(
                     "brasa.commands.firmware._is_interactive", return_value=False
                 ):
                     assert _resolve_board(None, use_config=False) == "RPI_PICO"
 
     @patch("brasa.commands.firmware._is_interactive", return_value=False)
-    @patch("brasa.commands.firmware.detect_board", return_value="ESP8266_GENERIC")
+    @patch(
+        "brasa.commands.firmware.detect_board",
+        return_value="ESP8266_GENERIC",
+    )
     @patch("brasa.commands.firmware.resolve_port", return_value="/dev/test")
     @patch("brasa.commands.firmware.load_config", return_value=_CFG_NO_FIRMWARE)
     def test_falls_back_to_device_detection(
@@ -77,11 +83,16 @@ class TestResolveBoard:
 
         assert _resolve_board(None) == "ESP8266_GENERIC"
 
+    @patch("brasa.commands.firmware._is_interactive", return_value=True)
     @patch("brasa.commands.firmware.detect_board", return_value=None)
     @patch("brasa.commands.firmware.resolve_port", side_effect=SystemExit(1))
     @patch("brasa.commands.firmware.load_config", return_value=_CFG_NO_FIRMWARE)
     def test_device_detection_failure_does_not_crash(
-        self, mock_cfg: MagicMock, mock_port: MagicMock, mock_detect: MagicMock
+        self,
+        mock_cfg: MagicMock,
+        mock_port: MagicMock,
+        mock_detect: MagicMock,
+        mock_tty: MagicMock,
     ) -> None:
         """When device detection fails, resolution continues to interactive prompt."""
         import questionary as q_module
