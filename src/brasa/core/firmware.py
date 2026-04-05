@@ -41,16 +41,14 @@ def firmware_cache_path(cfg: FirmwareConfig) -> Path:
     return cache_dir() / _firmware_filename(cfg)
 
 
-def download_firmware(cfg: FirmwareConfig) -> Path:
-    """Download firmware via httpx streaming with progress. Skip if cached. Return local path."""
-    path = firmware_cache_path(cfg)
-    if path.exists():
-        output.status("firmware", f"cached: {path}")
-        return path
+def _download_file(url: str, dest: Path) -> Path:
+    """Download *url* to *dest* with streaming progress. Skip if already cached."""
+    if dest.exists():
+        output.status("firmware", f"cached: {dest}")
+        return dest
 
-    url = firmware_url(cfg)
     output.status("firmware", f"downloading {url}")
-    path.parent.mkdir(parents=True, exist_ok=True)
+    dest.parent.mkdir(parents=True, exist_ok=True)
 
     brasa_dir = path.parent.parent  # .brasa/
     gitignore = brasa_dir / ".gitignore"
@@ -61,7 +59,7 @@ def download_firmware(cfg: FirmwareConfig) -> Path:
         response.raise_for_status()
         total = int(response.headers.get("content-length", 0))
         downloaded = 0
-        with path.open("wb") as f:
+        with dest.open("wb") as f:
             for chunk in response.iter_bytes(chunk_size=8192):
                 f.write(chunk)
                 downloaded += len(chunk)
@@ -69,34 +67,18 @@ def download_firmware(cfg: FirmwareConfig) -> Path:
                     pct = downloaded * 100 // total
                     output.status("firmware", f"downloading… {pct}%")
 
-    output.status("firmware", f"saved to {path}")
-    return path
+    output.status("firmware", f"saved to {dest}")
+    return dest
+
+
+def download_firmware(cfg: FirmwareConfig) -> Path:
+    """Download firmware via httpx streaming with progress. Skip if cached. Return local path."""
+    return _download_file(firmware_url(cfg), firmware_cache_path(cfg))
 
 
 def download_entry(entry: FirmwareEntry) -> Path:
     """Download a firmware entry to the cache. Skip if already cached. Return local path."""
-    path = cache_dir() / entry.filename
-    if path.exists():
-        output.status("firmware", f"cached: {path}")
-        return path
-
-    output.status("firmware", f"downloading {entry.url}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with httpx.stream("GET", entry.url, follow_redirects=True) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("content-length", 0))
-        downloaded = 0
-        with path.open("wb") as f:
-            for chunk in response.iter_bytes(chunk_size=8192):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total:
-                    pct = downloaded * 100 // total
-                    output.status("firmware", f"downloading… {pct}%")
-
-    output.status("firmware", f"saved to {path}")
-    return path
+    return _download_file(entry.url, cache_dir() / entry.filename)
 
 
 def flash_firmware(port: str, firmware_path: Path) -> None:

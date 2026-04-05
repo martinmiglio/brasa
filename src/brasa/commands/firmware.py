@@ -3,10 +3,11 @@
 import sys
 from typing import Annotated
 
+import questionary
 import typer
 
 from brasa.core import output
-from brasa.core.config import load_config, require_config
+from brasa.core.config import BrasaConfig, load_config, require_config
 from brasa.core.device import detect_board
 from brasa.core.firmware import (
     download_entry,
@@ -42,14 +43,18 @@ def _is_interactive() -> bool:
 
 
 def _resolve_board(
-    board: str | None, *, port: str | None = None, use_config: bool = True
+    board: str | None,
+    *,
+    port: str | None = None,
+    use_config: bool = True,
+    config: BrasaConfig | None = None,
 ) -> str:
     """Resolve board from flag → config → device → interactive prompt."""
     if board:
         return board
 
     if use_config:
-        cfg = load_config()
+        cfg = config or load_config()
         if cfg.firmware.board and cfg.firmware.version:
             output.status("firmware", f"using board from config: {cfg.firmware.board}")
             return cfg.firmware.board
@@ -61,8 +66,6 @@ def _resolve_board(
         if detected:
             if not _is_interactive():
                 return detected
-            import questionary
-
             if questionary.confirm(
                 f"Detected {detected} from device. Use it?", default=True
             ).ask():
@@ -71,8 +74,6 @@ def _resolve_board(
         pass
 
     # Interactive: fuzzy-searchable board list
-    import questionary
-
     boards = fetch_board_list()
     board_ids = [b.id for b in boards]
     meta = {b.id: b.name for b in boards}
@@ -92,8 +93,6 @@ def _resolve_board(
 
 def _prompt_variant(index: BoardIndex) -> str:
     """Interactively prompt to select a variant."""
-    import questionary
-
     variants = list_variants(index)
     if len(variants) == 1:
         chosen = variants[0]
@@ -109,8 +108,6 @@ def _prompt_variant(index: BoardIndex) -> str:
 
 def _prompt_version(index: BoardIndex, variant: str) -> str:
     """Interactively prompt to select a version."""
-    import questionary
-
     versions = list_versions(index, variant)
     if not versions:
         output.error(f"no stable versions found for variant '{variant}'")
@@ -146,24 +143,15 @@ def _resolve_entry(
         if entry:
             return entry
         # Fall back: construct entry from config (may not be in index for older versions)
-        filename_variant = f"-{fw.variant}" if fw.variant else ""
-        ext = "uf2" if platform_for_board(fw.board) == "uf2" else "bin"
-        filename = f"{fw.board}{filename_variant}-{fw.date}-v{fw.version}.{ext}"
-        return FirmwareEntry(
-            board=fw.board,
-            variant=fw.variant,
-            version=fw.version,
-            date=fw.date,
-            filename=filename,
-            url=f"https://micropython.org/resources/firmware/{filename}",
-            ext=ext,
-        )
+        return FirmwareEntry.from_config(fw.board, fw.variant, fw.version, fw.date)
 
-    resolved_board = _resolve_board(board, port=port, use_config=use_config)
+    cfg = load_config() if use_config else None
+    resolved_board = _resolve_board(
+        board, port=port, use_config=use_config, config=cfg
+    )
 
     # Fill variant/version from config if not given via CLI flags
-    if use_config and (variant is None or version is None):
-        cfg = load_config()
+    if cfg and (variant is None or version is None):
         if cfg.firmware.board == resolved_board:
             if variant is None and cfg.firmware.variant:
                 variant = cfg.firmware.variant

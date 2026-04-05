@@ -1,5 +1,7 @@
 """Firmware index — scrape micropython.org for available firmware and cache locally."""
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -39,6 +41,25 @@ class FirmwareEntry:
     @property
     def is_preview(self) -> bool:
         return "preview" in self.version
+
+    @classmethod
+    def from_config(cls, board: str, variant: str, version: str, date: str) -> FirmwareEntry:
+        """Build a FirmwareEntry from config values, inferring filename and URL."""
+        # Deferred import to break circular dependency (firmware imports firmware_index)
+        from brasa.core.firmware import _firmware_ext
+
+        ext = _firmware_ext(board)
+        variant_part = f"-{variant}" if variant else ""
+        filename = f"{board}{variant_part}-{date}-v{version}.{ext}"
+        return cls(
+            board=board,
+            variant=variant,
+            version=version,
+            date=date,
+            filename=filename,
+            url=f"{_BASE_URL}/resources/firmware/{filename}",
+            ext=ext,
+        )
 
 
 @dataclass(frozen=True)
