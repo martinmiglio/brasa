@@ -76,14 +76,22 @@ def _find_config_file() -> tuple[Path | None, dict]:
 
     brasa_toml = cwd / "brasa.toml"
     if brasa_toml.is_file():
-        with brasa_toml.open("rb") as f:
-            data = tomllib.load(f)
+        try:
+            with brasa_toml.open("rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as exc:
+            error(f"malformed config: {exc}")
+            raise SystemExit(1)
         return brasa_toml, data
 
     pyproject_toml = cwd / "pyproject.toml"
     if pyproject_toml.is_file():
-        with pyproject_toml.open("rb") as f:
-            data = tomllib.load(f)
+        try:
+            with pyproject_toml.open("rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as exc:
+            error(f"malformed config: {exc}")
+            raise SystemExit(1)
         brasa_section = data.get("tool", {}).get("brasa")
         if brasa_section is not None:
             return pyproject_toml, brasa_section

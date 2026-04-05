@@ -50,17 +50,30 @@ def _download_file(url: str, dest: Path) -> Path:
     output.status("firmware", f"downloading {url}")
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    with httpx.stream("GET", url, follow_redirects=True) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("content-length", 0))
-        downloaded = 0
-        with dest.open("wb") as f:
-            for chunk in response.iter_bytes(chunk_size=8192):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total:
-                    pct = downloaded * 100 // total
-                    output.status("firmware", f"downloading… {pct}%")
+    try:
+        with httpx.stream("GET", url, follow_redirects=True, timeout=30) as response:
+            response.raise_for_status()
+            total = int(response.headers.get("content-length", 0))
+            downloaded = 0
+            with dest.open("wb") as f:
+                for chunk in response.iter_bytes(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        pct = downloaded * 100 // total
+                        output.status("firmware", f"downloading… {pct}%")
+    except httpx.HTTPStatusError as exc:
+        dest.unlink(missing_ok=True)
+        output.error(f"download failed: HTTP {exc.response.status_code} for {url}")
+        raise SystemExit(1)
+    except httpx.TimeoutException:
+        dest.unlink(missing_ok=True)
+        output.error(f"download timed out for {url}")
+        raise SystemExit(1)
+    except httpx.ConnectError as exc:
+        dest.unlink(missing_ok=True)
+        output.error(f"connection failed for {url}: {exc}")
+        raise SystemExit(1)
 
     output.status("firmware", f"saved to {dest}")
     return dest
@@ -78,24 +91,39 @@ def download_entry(entry: FirmwareEntry) -> Path:
 
 def flash_firmware(port: str, firmware_path: Path) -> None:
     """Erase flash then write firmware via esptool subprocess."""
-    output.status("flash", f"erasing flash on {port}")
-    subprocess.run(["esptool", "--port", port, "erase-flash"], check=True)
+    try:
+        output.status("flash", f"erasing flash on {port}")
+        subprocess.run(
+            ["esptool", "--port", port, "erase-flash"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        output.error(f"flash erase failed: {exc.stderr or exc}")
+        raise SystemExit(1)
 
-    output.status("flash", f"writing {firmware_path} to {port}")
-    subprocess.run(
-        [
-            "esptool",
-            "--port",
-            port,
-            "--baud",
-            "460800",
-            "write-flash",
-            "--flash-size=detect",
-            "0",
-            str(firmware_path),
-        ],
-        check=True,
-    )
+    try:
+        output.status("flash", f"writing {firmware_path} to {port}")
+        subprocess.run(
+            [
+                "esptool",
+                "--port",
+                port,
+                "--baud",
+                "460800",
+                "write-flash",
+                "--flash-size=detect",
+                "0",
+                str(firmware_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        output.error(f"flash write failed: {exc.stderr or exc}")
+        raise SystemExit(1)
 
 
 def _detect_uf2_mount() -> Path | None:

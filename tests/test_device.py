@@ -152,7 +152,7 @@ def test_detect_board_unknown_returns_none(mock_exec: MagicMock) -> None:
     assert detect_board(PORT) is None
 
 
-@patch("brasa.core.device.exec_expr", side_effect=Exception("device not found"))
+@patch("brasa.core.device.exec_expr", side_effect=OSError("device not found"))
 def test_detect_board_error_returns_none(mock_exec: MagicMock) -> None:
     assert detect_board(PORT) is None
 

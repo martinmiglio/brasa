@@ -71,7 +71,7 @@ def detect_board(port: str) -> str | None:
     try:
         platform = exec_expr(port, "import sys; print(sys.platform)").strip()
         return _PLATFORM_TO_BOARD.get(platform)
-    except Exception:  # noqa: BLE001
+    except (subprocess.CalledProcessError, OSError):
         return None
 
 
@@ -102,5 +102,5 @@ def dtr_reset(port: str) -> None:
         time.sleep(0.1)
         ser.dtr = True
         ser.close()
-    except Exception as exc:  # noqa: BLE001
+    except (serial.SerialException, OSError) as exc:
         warn(f"DTR reset failed on {port}: {exc}")

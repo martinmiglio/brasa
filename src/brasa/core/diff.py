@@ -9,7 +9,7 @@ from pathlib import Path
 
 from brasa.core.config import DeployConfig
 from brasa.core.device import fs_cat, fs_ls
-from brasa.core.output import cyan, dim, green, red, success
+from brasa.core.output import cyan, dim, error, green, red, success
 
 
 class DiffStatus(Enum):
@@ -50,7 +50,11 @@ def _diff_text_files(
     diffs: list[FileDiff] = []
     for name in sorted(local_files & device_files):
         local_content = (src_dir / name).read_text()
-        device_content = fs_cat(port, f"/{name}")
+        try:
+            device_content = fs_cat(port, f"/{name}")
+        except subprocess.CalledProcessError:
+            error(f"could not read /{name} from device")
+            continue
         if local_content == device_content:
             continue
         diff_lines = list(
@@ -71,7 +75,11 @@ def _diff_flat(
     port: str, cfg: DeployConfig, src_dir: Path, local_files: set[str]
 ) -> list[FileDiff]:
     """Flat (non-ROMFS) diff: compare all local .py against device root .py files."""
-    listing = fs_ls(port, "/")
+    try:
+        listing = fs_ls(port, "/")
+    except subprocess.CalledProcessError:
+        error("could not list files on device — is the board connected?")
+        raise SystemExit(1)
     device_files = {
         name for name in _parse_device_filenames(listing) if name.endswith(".py")
     }
@@ -97,7 +105,11 @@ def _diff_romfs(
     local_romfs = local_files - boot_names - {env_name}
 
     # Get device root listing for boot file comparison.
-    root_listing = fs_ls(port, "/")
+    try:
+        root_listing = fs_ls(port, "/")
+    except subprocess.CalledProcessError:
+        error("could not list files on device — is the board connected?")
+        raise SystemExit(1)
     root_py_files = {
         name for name in _parse_device_filenames(root_listing) if name.endswith(".py")
     }

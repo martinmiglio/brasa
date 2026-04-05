@@ -133,7 +133,14 @@ def _scrape_board_page(board: str) -> list[FirmwareEntry]:
     """Fetch a board's download page and extract firmware entries."""
     url = f"{_BASE_URL}/download/{board}/"
     output.status("firmware", f"fetching index for {board}")
-    response = httpx.get(url, follow_redirects=True)
+    try:
+        response = httpx.get(url, follow_redirects=True, timeout=30)
+    except httpx.TimeoutException:
+        output.error(f"timed out fetching firmware index for {board}")
+        raise SystemExit(1)
+    except httpx.ConnectError as exc:
+        output.error(f"connection failed fetching firmware index: {exc}")
+        raise SystemExit(1)
     if response.status_code == 404:
         output.error(
             f"board '{board}' not found on micropython.org — "
@@ -141,7 +148,11 @@ def _scrape_board_page(board: str) -> list[FirmwareEntry]:
             "(e.g. ESP8266_GENERIC, ESP32_GENERIC, RPI_PICO)"
         )
         raise SystemExit(1)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        output.error(f"failed to fetch firmware index: HTTP {exc.response.status_code}")
+        raise SystemExit(1)
 
     parser = _FirmwareLinkParser()
     parser.feed(response.text)
@@ -167,14 +178,23 @@ def _save_index(board: str, entries: list[FirmwareEntry]) -> BoardIndex:
         "fetched_at": now,
         "entries": [asdict(e) for e in entries],
     }
-    path.write_text(json.dumps(data, indent=2))
+    try:
+        path.write_text(json.dumps(data, indent=2))
+    except OSError as exc:
+        output.warn(f"could not cache firmware index: {exc}")
     return index
 
 
 def _load_index(board: str) -> BoardIndex:
     """Load a board index from the JSON cache."""
     path = _index_path(board)
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        output.warn(f"corrupted cache for {board}, re-fetching")
+        path.unlink(missing_ok=True)
+        entries = _scrape_board_page(board)
+        return _save_index(board, entries)
     entries = tuple(FirmwareEntry(**e) for e in data["entries"])
     return BoardIndex(
         board=data["board"], entries=entries, fetched_at=data["fetched_at"]
@@ -274,8 +294,19 @@ def _scrape_board_list() -> list[BoardInfo]:
     """Fetch micropython.org/download/ and extract available boards."""
     url = f"{_BASE_URL}/download/"
     output.status("firmware", "fetching board list")
-    response = httpx.get(url, follow_redirects=True)
-    response.raise_for_status()
+    try:
+        response = httpx.get(url, follow_redirects=True, timeout=30)
+    except httpx.TimeoutException:
+        output.error("timed out fetching board list from micropython.org")
+        raise SystemExit(1)
+    except httpx.ConnectError as exc:
+        output.error(f"connection failed fetching board list: {exc}")
+        raise SystemExit(1)
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        output.error(f"failed to fetch board list: HTTP {exc.response.status_code}")
+        raise SystemExit(1)
 
     parser = _BoardLinkParser()
     parser.feed(response.text)
@@ -294,8 +325,13 @@ def fetch_board_list(*, force_refresh: bool = False) -> list[BoardInfo]:
     path = _board_list_path()
     if not force_refresh and _is_fresh(path):
         output.status("firmware", "using cached board list")
-        data = json.loads(path.read_text())
-        return [BoardInfo(**b) for b in data["boards"]]
+        try:
+            data = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            output.warn("corrupted board list cache, re-fetching")
+            path.unlink(missing_ok=True)
+        else:
+            return [BoardInfo(**b) for b in data["boards"]]
 
     boards = _scrape_board_list()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -303,5 +339,8 @@ def fetch_board_list(*, force_refresh: bool = False) -> list[BoardInfo]:
         "fetched_at": time.time(),
         "boards": [{"id": b.id, "name": b.name} for b in boards],
     }
-    path.write_text(json.dumps(data, indent=2))
+    try:
+        path.write_text(json.dumps(data, indent=2))
+    except OSError as exc:
+        output.warn(f"could not cache board list: {exc}")
     return boards

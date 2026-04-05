@@ -1,6 +1,7 @@
 """Deploy project files to a MicroPython device."""
 
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -25,16 +26,24 @@ def _copy_boot_files(port: str, cfg: DeployConfig) -> None:
         error(f"env file not found: {cfg.env_file}")
         raise SystemExit(1)
 
-    status("deploy", f"copying {cfg.env_file}")
-    fs_cp(port, cfg.env_file, ":/")
+    try:
+        status("deploy", f"copying {cfg.env_file}")
+        fs_cp(port, cfg.env_file, ":/")
+    except subprocess.CalledProcessError as exc:
+        error(f"failed to copy {cfg.env_file}: {exc.stderr or exc}")
+        raise SystemExit(1)
 
     for boot_file in cfg.boot_files:
         path = Path(boot_file)
         if not path.is_file():
             path = Path(cfg.src) / boot_file
         if path.is_file():
-            status("deploy", f"copying {path}")
-            fs_cp(port, str(path), ":/")
+            try:
+                status("deploy", f"copying {path}")
+                fs_cp(port, str(path), ":/")
+            except subprocess.CalledProcessError as exc:
+                error(f"failed to copy {path}: {exc.stderr or exc}")
+                raise SystemExit(1)
 
 
 def _deploy_romfs(port: str, cfg: DeployConfig) -> None:
@@ -64,7 +73,11 @@ def _deploy_romfs(port: str, cfg: DeployConfig) -> None:
                 raise SystemExit(1)
             args.append("--mpy")
         args.extend(["deploy", tmpdir + "/"])
-        mpremote_run(port, *args)
+        try:
+            mpremote_run(port, *args)
+        except subprocess.CalledProcessError as exc:
+            error(f"romfs deploy failed: {exc.stderr or exc}")
+            raise SystemExit(1)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -79,5 +92,9 @@ def _deploy_flat(port: str, cfg: DeployConfig) -> None:
             continue
         if src_file.name in exclude:
             continue
-        status("deploy", f"copying {src_file}")
-        fs_cp(port, str(src_file), ":/")
+        try:
+            status("deploy", f"copying {src_file}")
+            fs_cp(port, str(src_file), ":/")
+        except subprocess.CalledProcessError as exc:
+            error(f"failed to copy {src_file}: {exc.stderr or exc}")
+            raise SystemExit(1)
