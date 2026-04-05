@@ -229,7 +229,7 @@ def install(
     ),
 ) -> None:
     """Download and install firmware onto the device, then save to config."""
-    port_flag = ctx.obj.get("port") if ctx.obj else None
+    port_flag = ctx.obj.get("port")
     entry = _resolve_entry(
         board, variant, version, from_config=from_config, port=port_flag
     )
@@ -267,7 +267,7 @@ def show(
     """Show the firmware version running on the connected device."""
     import json as json_mod
 
-    port_flag = ctx.obj.get("port") if ctx.obj else None
+    port_flag = ctx.obj.get("port")
     port = resolve_port(port_flag)
     with port_lock(port, "firmware show"):
         info = device_firmware_info(port)

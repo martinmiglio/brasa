@@ -2,13 +2,14 @@
 
 import typer
 
-from brasa.cli import app, port_override
 from brasa.core import output
 from brasa.core.config import require_config
 from brasa.core.firmware import download_firmware, flash_firmware
 from brasa.core.lock import port_lock
 from brasa.core.output import success
 from brasa.core.port import resolve_port
+
+app = typer.Typer()
 
 
 @app.command(deprecated=True)
@@ -26,7 +27,7 @@ def flash(ctx: typer.Context) -> None:
         output.error("firmware.date is required in config")
         raise SystemExit(1)
 
-    port = resolve_port(port_override(ctx))
+    port = resolve_port(ctx.obj.get("port"))
     firmware_path = download_firmware(cfg.firmware)
     with port_lock(port, "flash"):
         flash_firmware(port, firmware_path)
