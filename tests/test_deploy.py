@@ -9,20 +9,6 @@ from brasa.core.config import DeployConfig
 from brasa.core.deploy import deploy
 
 
-@pytest.fixture()
-def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Create a minimal project layout and chdir into it."""
-    src = tmp_path / "src"
-    src.mkdir()
-    (src / "app.py").write_text("# app")
-    (src / "utils.py").write_text("# utils")
-    (tmp_path / ".env").write_text("SECRET=123")
-    (tmp_path / "boot.py").write_text("# boot")
-    (tmp_path / "main.py").write_text("# main")
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
-
-
 @patch("brasa.core.deploy.shutil.which", return_value="/usr/bin/mpy-cross")
 @patch("brasa.core.deploy.mpremote_run")
 @patch("brasa.core.deploy.fs_cp")
@@ -43,11 +29,11 @@ def test_deploy_romfs(
 
     # mpremote romfs called with --mpy.
     mock_mpremote.assert_called_once()
-    args = mock_mpremote.call_args[0]
-    assert args[0] == "/dev/cu.test"
-    assert "romfs" in args
-    assert "--mpy" in args
-    assert "deploy" in args
+    call_args = mock_mpremote.call_args[0]
+    assert "/dev/cu.test" in call_args
+    assert "romfs" in call_args
+    assert "--mpy" in call_args
+    assert "deploy" in call_args
 
 
 @patch("brasa.core.deploy.mpremote_run")
@@ -59,10 +45,10 @@ def test_deploy_romfs_no_mpy(
     cfg = DeployConfig(mpy_compile=False)
     deploy("/dev/cu.test", cfg)
 
-    args = mock_mpremote.call_args[0]
-    assert "--mpy" not in args
-    assert "romfs" in args
-    assert "deploy" in args
+    call_args = mock_mpremote.call_args[0]
+    assert "--mpy" not in call_args
+    assert "romfs" in call_args
+    assert "deploy" in call_args
 
 
 @patch("brasa.core.deploy.mpremote_run")
@@ -78,13 +64,11 @@ def test_deploy_flat(
     mock_mpremote.assert_not_called()
 
     # Boot files + source files copied via fs_cp.
-    cp_calls = mock_fs_cp.call_args_list
-    copied_srcs = [c[0][1] for c in cp_calls]
-    # env_file and boot files.
-    assert ".env" in copied_srcs
-    assert "boot.py" in copied_srcs
-    assert "main.py" in copied_srcs
-    # Source files.
+    assert call("/dev/cu.test", ".env", ":/") in mock_fs_cp.call_args_list
+    assert call("/dev/cu.test", "boot.py", ":/") in mock_fs_cp.call_args_list
+    assert call("/dev/cu.test", "main.py", ":/") in mock_fs_cp.call_args_list
+    # Source files (paths include src/ prefix, destination is :/).
+    copied_srcs = [c[0][1] for c in mock_fs_cp.call_args_list]
     assert any("app.py" in s for s in copied_srcs)
     assert any("utils.py" in s for s in copied_srcs)
 
@@ -121,9 +105,8 @@ def test_deploy_skips_missing_boot_files(
     cfg = DeployConfig()
     deploy("/dev/cu.test", cfg)
 
-    copied = [c[0][1] for c in mock_fs_cp.call_args_list]
-    assert "boot.py" in copied
-    assert "main.py" not in copied
+    assert call("/dev/cu.test", "boot.py", ":/") in mock_fs_cp.call_args_list
+    assert call("/dev/cu.test", "main.py", ":/") not in mock_fs_cp.call_args_list
 
 
 @patch("brasa.core.deploy.shutil.which", return_value="/usr/bin/mpy-cross")
@@ -139,9 +122,9 @@ def test_deploy_romfs_temp_dir_cleaned(
     cfg = DeployConfig()
     deploy("/dev/cu.test", cfg)
 
-    # Extract the tmpdir from the mpremote call.
-    args = mock_mpremote.call_args[0]
-    tmpdir = args[-1].rstrip("/")
+    # Extract the tmpdir from the mpremote call (always the last positional arg).
+    call_args = mock_mpremote.call_args[0]
+    tmpdir = call_args[-1].rstrip("/")
     assert not Path(tmpdir).exists()
 
 

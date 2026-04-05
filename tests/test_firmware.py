@@ -3,12 +3,17 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import httpx
+import pytest
+
 from brasa.core.config import FirmwareConfig
 from brasa.core.firmware import (
+    _download_file,
     download_firmware,
     firmware_cache_path,
     firmware_url,
     flash_firmware,
+    install_firmware,
     install_uf2,
     platform_for_board,
 )
@@ -164,7 +169,107 @@ def test_install_uf2_copies_file(mock_copy: MagicMock, tmp_path: Path) -> None:
 
 @patch("brasa.core.firmware._detect_uf2_mount", return_value=None)
 def test_install_uf2_errors_no_mount(mock_detect: MagicMock) -> None:
-    import pytest
-
     with pytest.raises(SystemExit):
         install_uf2(Path("test.uf2"))
+
+
+# ── download error paths ──────────────────────────────────────────────────
+
+
+def test_download_http_error(tmp_path: Path) -> None:
+    dest = tmp_path / "firmware.bin"
+    request = httpx.Request("GET", "https://example.com/firmware.bin")
+    response = httpx.Response(status_code=404, request=request)
+    exc = httpx.HTTPStatusError("Not Found", request=request, response=response)
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.side_effect = exc
+    mock_resp.headers = {"content-length": "0"}
+
+    mock_cm = MagicMock()
+    mock_cm.__enter__ = MagicMock(return_value=mock_resp)
+    mock_cm.__exit__ = MagicMock(return_value=False)
+
+    with patch("brasa.core.firmware.httpx") as mock_httpx:
+        mock_httpx.HTTPStatusError = httpx.HTTPStatusError
+        mock_httpx.TimeoutException = httpx.TimeoutException
+        mock_httpx.ConnectError = httpx.ConnectError
+        mock_httpx.stream.return_value = mock_cm
+        with pytest.raises(SystemExit):
+            _download_file("https://example.com/firmware.bin", dest)
+
+
+def test_download_timeout(tmp_path: Path) -> None:
+    dest = tmp_path / "firmware.bin"
+
+    mock_cm = MagicMock()
+    mock_cm.__enter__ = MagicMock(side_effect=httpx.TimeoutException("timed out"))
+    mock_cm.__exit__ = MagicMock(return_value=False)
+
+    with patch("brasa.core.firmware.httpx") as mock_httpx:
+        mock_httpx.HTTPStatusError = httpx.HTTPStatusError
+        mock_httpx.TimeoutException = httpx.TimeoutException
+        mock_httpx.ConnectError = httpx.ConnectError
+        mock_httpx.stream.return_value = mock_cm
+        with pytest.raises(SystemExit):
+            _download_file("https://example.com/firmware.bin", dest)
+
+
+def test_download_connection_error(tmp_path: Path) -> None:
+    dest = tmp_path / "firmware.bin"
+
+    mock_cm = MagicMock()
+    mock_cm.__enter__ = MagicMock(side_effect=httpx.ConnectError("connection refused"))
+    mock_cm.__exit__ = MagicMock(return_value=False)
+
+    with patch("brasa.core.firmware.httpx") as mock_httpx:
+        mock_httpx.HTTPStatusError = httpx.HTTPStatusError
+        mock_httpx.TimeoutException = httpx.TimeoutException
+        mock_httpx.ConnectError = httpx.ConnectError
+        mock_httpx.stream.return_value = mock_cm
+        with pytest.raises(SystemExit):
+            _download_file("https://example.com/firmware.bin", dest)
+
+
+# ── flash error paths ─────────────────────────────────────────────────────
+
+
+def test_flash_erase_fails(fp) -> None:  # type: ignore[no-untyped-def]
+    fp.register(
+        ["esptool", "--port", "/dev/cu.test", "erase-flash"],
+        returncode=1,
+        stderr="erase error",
+    )
+
+    with pytest.raises(SystemExit):
+        flash_firmware("/dev/cu.test", Path("firmware/test.bin"))
+
+
+def test_flash_write_fails(fp) -> None:  # type: ignore[no-untyped-def]
+    fp.register(["esptool", "--port", "/dev/cu.test", "erase-flash"], returncode=0)
+    fp.register(
+        [
+            "esptool",
+            "--port",
+            "/dev/cu.test",
+            "--baud",
+            "460800",
+            "write-flash",
+            "--flash-size=detect",
+            "0",
+            "firmware/test.bin",
+        ],
+        returncode=1,
+        stderr="write error",
+    )
+
+    with pytest.raises(SystemExit):
+        flash_firmware("/dev/cu.test", Path("firmware/test.bin"))
+
+
+# ── install error paths ───────────────────────────────────────────────────
+
+
+def test_install_firmware_esp_no_port() -> None:
+    with pytest.raises(SystemExit):
+        install_firmware(Path("firmware.bin"), port=None, platform="esp")

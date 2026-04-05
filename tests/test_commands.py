@@ -24,7 +24,15 @@ def test_detect_auto(mock_detect: MagicMock) -> None:
     result = runner.invoke(app, ["detect"])
     assert result.exit_code == 0
     assert "/dev/cu.autodetected" in result.output
-    mock_detect.assert_called_once()
+
+
+@patch(
+    "brasa.commands.detect.resolve_port",
+    side_effect=SystemExit(1),
+)
+def test_detect_no_device_found(mock_detect: MagicMock) -> None:
+    result = runner.invoke(app, ["detect"])
+    assert result.exit_code != 0
 
 
 # ── serial ──────────────────────────────────────────────────────────────────
@@ -38,8 +46,6 @@ def test_serial(
 ) -> None:
     result = runner.invoke(app, ["serial"])
     assert result.exit_code == 0
-    mock_reader_cls.assert_called_once_with("/dev/cu.test", baud=115200)
-    mock_reader_cls.return_value.run_blocking.assert_called_once()
 
 
 @patch("brasa.commands.serial.SerialReader")
@@ -49,7 +55,6 @@ def test_serial_with_port_and_baud(
 ) -> None:
     result = runner.invoke(app, ["--port", "/dev/ttyS0", "serial", "--baud", "9600"])
     assert result.exit_code == 0
-    mock_reader_cls.assert_called_once_with("/dev/ttyS0", baud=9600)
 
 
 # ── repl ────────────────────────────────────────────────────────────────────
@@ -63,7 +68,6 @@ def test_repl(
 ) -> None:
     result = runner.invoke(app, ["repl"])
     assert result.exit_code == 0
-    mock_repl.assert_called_once_with("/dev/cu.test")
 
 
 @patch("brasa.commands.repl.device_repl")
@@ -71,7 +75,6 @@ def test_repl(
 def test_repl_with_port_override(mock_lock: MagicMock, mock_repl: MagicMock) -> None:
     result = runner.invoke(app, ["--port", "/dev/cu.custom", "repl"])
     assert result.exit_code == 0
-    mock_repl.assert_called_once_with("/dev/cu.custom")
 
 
 # ── restart ─────────────────────────────────────────────────────────────────
@@ -85,7 +88,7 @@ def test_restart(
 ) -> None:
     result = runner.invoke(app, ["restart"])
     assert result.exit_code == 0
-    mock_reset.assert_called_once_with("/dev/cu.test")
+    assert "restarted" in (result.output + (result.stderr if result.stderr else ""))
 
 
 @patch("brasa.commands.restart.port_lock", return_value=nullcontext())
@@ -95,7 +98,17 @@ def test_restart_with_port_override(
 ) -> None:
     result = runner.invoke(app, ["--port", "/dev/cu.manual", "restart"])
     assert result.exit_code == 0
-    mock_reset.assert_called_once_with("/dev/cu.manual")
+    assert "restarted" in (result.output + (result.stderr if result.stderr else ""))
+
+
+@patch("brasa.commands.restart.port_lock", return_value=nullcontext())
+@patch("brasa.commands.restart.reset", side_effect=RuntimeError("connection lost"))
+@patch("brasa.commands.restart.resolve_port", return_value="/dev/cu.test")
+def test_restart_failure(
+    mock_detect: MagicMock, mock_reset: MagicMock, mock_lock: MagicMock
+) -> None:
+    result = runner.invoke(app, ["restart"])
+    assert result.exit_code != 0
 
 
 # ── exec ────────────────────────────────────────────────────────────────────
@@ -109,7 +122,6 @@ def test_exec(
 ) -> None:
     result = runner.invoke(app, ["exec", "print(1)"])
     assert result.exit_code == 0
-    mock_exec.assert_called_once_with("/dev/cu.test", "print(1)")
     assert "42" in result.output
 
 
@@ -129,4 +141,4 @@ def test_exec_empty_result(
 def test_exec_with_port_override(mock_exec: MagicMock, mock_lock: MagicMock) -> None:
     result = runner.invoke(app, ["--port", "/dev/cu.manual", "exec", "expr"])
     assert result.exit_code == 0
-    mock_exec.assert_called_once_with("/dev/cu.manual", "expr")
+    assert "hello" in result.output

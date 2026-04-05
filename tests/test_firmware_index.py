@@ -1,6 +1,9 @@
 """Tests for brasa.core.firmware_index — HTML scraping, caching, queries."""
 
+import json
+import os
 import time
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -201,35 +204,79 @@ def test_find_entry_not_found() -> None:
 # ── fetch_board_index ───────────────────────────────────────────────────────
 
 
-@patch("brasa.core.firmware_index._is_fresh", return_value=True)
-@patch("brasa.core.firmware_index._load_index", return_value=_INDEX)
+def _write_board_cache(
+    tmp_path: Path, board: str, entries: tuple[FirmwareEntry, ...]
+) -> Path:
+    """Write a valid board index cache file and return its path."""
+    cache_file = tmp_path / f"{board}.index.json"
+    data = {
+        "board": board,
+        "fetched_at": time.time(),
+        "entries": [asdict(e) for e in entries],
+    }
+    cache_file.write_text(json.dumps(data))
+    return cache_file
+
+
+@patch("brasa.core.firmware_index._scrape_board_page")
 def test_fetch_uses_cache_when_fresh(
-    mock_load: MagicMock, mock_fresh: MagicMock
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    _write_board_cache(tmp_path, "ESP32_GENERIC", _ENTRIES)
+
     result = fetch_board_index("ESP32_GENERIC")
-    assert result is _INDEX
-    mock_load.assert_called_once()
+
+    mock_scrape.assert_not_called()
+    assert result.board == "ESP32_GENERIC"
+    assert len(result.entries) == len(_ENTRIES)
+    assert result.entries[0].version == "1.27.0"
 
 
-@patch("brasa.core.firmware_index._save_index", return_value=_INDEX)
 @patch("brasa.core.firmware_index._scrape_board_page", return_value=list(_ENTRIES))
-@patch("brasa.core.firmware_index._is_fresh", return_value=False)
 def test_fetch_scrapes_when_stale(
-    mock_fresh: MagicMock, mock_scrape: MagicMock, mock_save: MagicMock
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    cache_file = _write_board_cache(tmp_path, "ESP32_GENERIC", _ENTRIES)
+    # Make the file stale (older than 1 hour)
+    stale_time = time.time() - 7200
+    os.utime(cache_file, (stale_time, stale_time))
+
     result = fetch_board_index("ESP32_GENERIC")
-    assert result is _INDEX
+
     mock_scrape.assert_called_once_with("ESP32_GENERIC")
+    assert result.board == "ESP32_GENERIC"
+    assert len(result.entries) == len(_ENTRIES)
+    # Verify the cache file was updated (mtime should be recent)
+    assert cache_file.stat().st_mtime > stale_time
 
 
-@patch("brasa.core.firmware_index._save_index", return_value=_INDEX)
 @patch("brasa.core.firmware_index._scrape_board_page", return_value=list(_ENTRIES))
-@patch("brasa.core.firmware_index._is_fresh", return_value=True)
 def test_fetch_force_refresh(
-    mock_fresh: MagicMock, mock_scrape: MagicMock, mock_save: MagicMock
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    _write_board_cache(tmp_path, "ESP32_GENERIC", _ENTRIES)
+
     fetch_board_index("ESP32_GENERIC", force_refresh=True)
+
     mock_scrape.assert_called_once()
+
+
+@patch("brasa.core.firmware_index._scrape_board_page", return_value=list(_ENTRIES))
+def test_corrupted_cache_triggers_rescrape(
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    cache_file = tmp_path / "ESP32_GENERIC.index.json"
+    cache_file.write_text("not valid json {{{")
+
+    result = fetch_board_index("ESP32_GENERIC")
+
+    mock_scrape.assert_called()
+    assert result.board == "ESP32_GENERIC"
+    assert len(result.entries) == len(_ENTRIES)
 
 
 # ── Board list scraping ────────────────────────────────────────────────────
@@ -266,38 +313,56 @@ _BOARD_LIST = [
 ]
 
 
-@patch("brasa.core.firmware_index._is_fresh", return_value=True)
-@patch("brasa.core.firmware_index._board_list_path")
-def test_fetch_board_list_uses_cache(
-    mock_path: MagicMock, mock_fresh: MagicMock, tmp_path: Path
-) -> None:
+def _write_board_list_cache(tmp_path: Path, boards: list[BoardInfo]) -> Path:
+    """Write a valid board list cache file and return its path."""
     cache_file = tmp_path / "boards.json"
-    import json
+    data = {
+        "fetched_at": time.time(),
+        "boards": [{"id": b.id, "name": b.name} for b in boards],
+    }
+    cache_file.write_text(json.dumps(data))
+    return cache_file
 
-    cache_file.write_text(
-        json.dumps(
-            {
-                "fetched_at": time.time(),
-                "boards": [{"id": b.id, "name": b.name} for b in _BOARD_LIST],
-            }
-        )
-    )
-    mock_path.return_value = cache_file
+
+@patch("brasa.core.firmware_index._scrape_board_list")
+def test_fetch_board_list_uses_cache(
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    _write_board_list_cache(tmp_path, _BOARD_LIST)
+
     result = fetch_board_list()
+
+    mock_scrape.assert_not_called()
     assert len(result) == 2
     assert result[0].id == "ESP32_GENERIC"
 
 
-@patch("brasa.core.firmware_index._board_list_path")
 @patch("brasa.core.firmware_index._scrape_board_list", return_value=_BOARD_LIST)
-@patch("brasa.core.firmware_index._is_fresh", return_value=False)
 def test_fetch_board_list_scrapes_when_stale(
-    mock_fresh: MagicMock,
-    mock_scrape: MagicMock,
-    mock_path: MagicMock,
-    tmp_path: Path,
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    mock_path.return_value = tmp_path / "boards.json"
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    cache_file = _write_board_list_cache(tmp_path, _BOARD_LIST)
+    stale_time = time.time() - 7200
+    os.utime(cache_file, (stale_time, stale_time))
+
     result = fetch_board_list()
+
     assert len(result) == 2
     mock_scrape.assert_called_once()
+
+
+@patch("brasa.core.firmware_index._scrape_board_list", return_value=_BOARD_LIST)
+def test_corrupted_board_list_cache_triggers_rescrape(
+    mock_scrape: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("BRASA_CACHE_DIR", str(tmp_path))
+    cache_file = tmp_path / "boards.json"
+    cache_file.write_text("not valid json {{{")
+
+    result = fetch_board_list()
+
+    mock_scrape.assert_called_once()
+    assert len(result) == 2
+    assert result[0].id == "ESP32_GENERIC"

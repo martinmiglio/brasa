@@ -125,11 +125,13 @@ class TestResolveEntryConfigFallback:
     ) -> None:
         from brasa.commands.firmware import _resolve_entry
 
-        _resolve_entry(None, None, None)
+        result = _resolve_entry(None, None, None)
         # Should have used SPIRAM and 1.27.0 from config, not prompted
-        mock_find.assert_called_once_with(_INDEX, "SPIRAM", "1.27.0")
+        assert result.board == "ESP32_GENERIC"
+        assert result.variant == "SPIRAM"
+        assert result.version == "1.27.0"
 
-    @patch("brasa.commands.firmware.find_entry", return_value=_ENTRIES[0])
+    @patch("brasa.commands.firmware.find_entry", return_value=_ENTRIES[1])
     @patch("brasa.commands.firmware.fetch_board_index", return_value=_INDEX)
     @patch("brasa.commands.firmware._resolve_board", return_value="ESP32_GENERIC")
     @patch("brasa.commands.firmware.load_config", return_value=_CFG_WITH_FIRMWARE)
@@ -142,8 +144,11 @@ class TestResolveEntryConfigFallback:
     ) -> None:
         from brasa.commands.firmware import _resolve_entry
 
-        _resolve_entry(None, "", "1.26.1")
-        mock_find.assert_called_once_with(_INDEX, "", "1.26.1")
+        result = _resolve_entry(None, "", "1.26.1")
+        # CLI flags override config values
+        assert result.board == "ESP32_GENERIC"
+        assert result.variant == ""
+        assert result.version == "1.26.1"
 
     @patch("brasa.commands.firmware._prompt_version", return_value="1.27.0")
     @patch("brasa.commands.firmware._prompt_variant", return_value="")
@@ -162,9 +167,12 @@ class TestResolveEntryConfigFallback:
     ) -> None:
         from brasa.commands.firmware import _resolve_entry
 
-        _resolve_entry(None, None, None)
+        result = _resolve_entry(None, None, None)
         mock_variant.assert_called_once()
         mock_version.assert_called_once()
+        assert result.board == "ESP32_GENERIC"
+        assert result.variant == ""
+        assert result.version == "1.27.0"
 
     @patch("brasa.commands.firmware._prompt_version", return_value="1.27.0")
     @patch("brasa.commands.firmware._prompt_variant", return_value="")
@@ -184,9 +192,12 @@ class TestResolveEntryConfigFallback:
         """Config variant/version skipped when resolved board doesn't match config board."""
         from brasa.commands.firmware import _resolve_entry
 
-        _resolve_entry(None, None, None)
+        result = _resolve_entry(None, None, None)
         mock_variant.assert_called_once()
         mock_version.assert_called_once()
+        assert result.board == "ESP32_GENERIC"
+        assert result.variant == ""
+        assert result.version == "1.27.0"
 
     @patch("brasa.commands.firmware._prompt_version", return_value="1.27.0")
     @patch("brasa.commands.firmware._prompt_variant", return_value="")
@@ -206,9 +217,12 @@ class TestResolveEntryConfigFallback:
         """select uses use_config=False, so variant/version should prompt."""
         from brasa.commands.firmware import _resolve_entry
 
-        _resolve_entry(None, None, None, use_config=False)
+        result = _resolve_entry(None, None, None, use_config=False)
         mock_variant.assert_called_once()
         mock_version.assert_called_once()
+        assert result.board == "ESP32_GENERIC"
+        assert result.variant == ""
+        assert result.version == "1.27.0"
 
 
 # ── CLI command integration tests ──────────────────────────────────────────
