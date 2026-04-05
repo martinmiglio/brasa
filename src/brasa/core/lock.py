@@ -5,10 +5,11 @@ import json
 import os
 import tempfile
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 
 from brasa.core.output import error, status, warn
+from brasa.core.port import resolve_port
 
 _ENV_KEY = "BRASA_PORT_LOCKED"
 _LOCK_DIR = tempfile.gettempdir()
@@ -92,3 +93,15 @@ def port_lock(port: str, caller: str) -> Generator[None, None, None]:
             except OSError:
                 pass
             os.close(fd)
+
+
+@contextmanager
+def resolved_port_lock(
+    port_override: str | None,
+    caller: str,
+    patterns: Sequence[str] | None = None,
+) -> Generator[str, None, None]:
+    """Resolve the port, acquire an exclusive lock, and yield the port string."""
+    port = resolve_port(port_override, patterns)
+    with port_lock(port, caller):
+        yield port

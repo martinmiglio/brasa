@@ -12,9 +12,8 @@ import watchfiles
 from brasa.core.config import BrasaConfig, require_config
 from brasa.core.deploy import deploy
 from brasa.core.device import dtr_reset
-from brasa.core.lock import port_lock
+from brasa.core.lock import resolved_port_lock
 from brasa.core.output import error, status, success, warn
-from brasa.core.port import resolve_port
 from brasa.core.serial import SerialReader
 
 app = typer.Typer()
@@ -28,9 +27,9 @@ _RESET_SETTLE_DELAY = 1  # seconds after device reset before resuming serial
 def dev(ctx: typer.Context) -> None:
     """Deploy, watch for changes, and stream serial output."""
     cfg = require_config()
-    port = resolve_port(ctx.obj.get("port"), cfg.port.patterns)
-
-    with port_lock(port, "dev"):
+    with resolved_port_lock(
+        ctx.obj.get("port"), "dev", patterns=cfg.port.patterns
+    ) as port:
         os.environ["BRASA_PORT_LOCKED"] = port
 
         if isinstance(sys.stdout, io.TextIOWrapper):

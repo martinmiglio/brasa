@@ -1,7 +1,6 @@
 """Tests for brasa.core.diff — file comparison logic and diff command."""
 
 import subprocess
-from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +10,7 @@ from typer.testing import CliRunner
 from brasa.cli import app
 from brasa.core.config import DeployConfig
 from brasa.core.diff import DiffStatus, FileDiff, diff_files, print_diff
+from tests.conftest import fake_port_lock
 
 runner = CliRunner()
 
@@ -424,16 +424,13 @@ def test_diff_handles_device_file_read_error(
 
 @patch("brasa.commands.diff.print_diff")
 @patch("brasa.commands.diff.diff_files", return_value=[])
-@patch("brasa.commands.diff.port_lock", return_value=nullcontext())
-@patch("brasa.commands.diff.resolve_port", return_value="/dev/cu.test")
+@patch("brasa.commands.diff.resolved_port_lock", fake_port_lock)
 @patch(
     "brasa.commands.diff.require_config",
     return_value=MagicMock(deploy=DeployConfig()),
 )
 def test_diff_command(
     mock_config: MagicMock,
-    mock_detect: MagicMock,
-    mock_lock: MagicMock,
     mock_diff_files: MagicMock,
     mock_print: MagicMock,
 ) -> None:
@@ -446,14 +443,13 @@ def test_diff_command(
 
 @patch("brasa.commands.diff.print_diff")
 @patch("brasa.commands.diff.diff_files", return_value=[])
-@patch("brasa.commands.diff.port_lock", return_value=nullcontext())
+@patch("brasa.commands.diff.resolved_port_lock", fake_port_lock)
 @patch(
     "brasa.commands.diff.require_config",
     return_value=MagicMock(deploy=DeployConfig()),
 )
 def test_diff_command_with_port_override(
     mock_config: MagicMock,
-    mock_lock: MagicMock,
     mock_diff_files: MagicMock,
     mock_print: MagicMock,
 ) -> None:

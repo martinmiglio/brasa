@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from brasa.core.lock import _ENV_KEY, _lock_path, port_lock
+from brasa.core.lock import _ENV_KEY, _lock_path, port_lock, resolved_port_lock
 
 
 @pytest.fixture(autouse=True)
@@ -122,3 +122,39 @@ class TestContention:
         # First two NB attempts fail, third succeeds, then unlock.
         assert calls[0] == fcntl.LOCK_EX | fcntl.LOCK_NB
         assert nb_attempts >= 2
+
+
+class TestResolvedPortLock:
+    """Combined resolve + lock context manager."""
+
+    def test_yields_resolved_port(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "brasa.core.lock.resolve_port", lambda override, patterns=None: PORT
+        )
+        with resolved_port_lock(None, CALLER) as port:
+            assert port == PORT
+            assert os.environ.get(_ENV_KEY) == PORT
+
+    def test_passes_override_to_resolve(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        received: list[tuple[str | None, object]] = []
+
+        def fake_resolve(override: str | None, patterns: object = None) -> str:
+            received.append((override, patterns))
+            return "/dev/cu.override"
+
+        monkeypatch.setattr("brasa.core.lock.resolve_port", fake_resolve)
+        with resolved_port_lock("/dev/cu.override", CALLER) as port:
+            assert port == "/dev/cu.override"
+        assert received[0] == ("/dev/cu.override", None)
+
+    def test_passes_patterns_to_resolve(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        received_patterns: list[object] = []
+
+        def fake_resolve(override: str | None, patterns: object = None) -> str:
+            received_patterns.append(patterns)
+            return PORT
+
+        monkeypatch.setattr("brasa.core.lock.resolve_port", fake_resolve)
+        with resolved_port_lock(None, CALLER, patterns=["cu.custom*"]) as port:
+            assert port == PORT
+        assert received_patterns[0] == ["cu.custom*"]

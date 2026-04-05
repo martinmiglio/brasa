@@ -25,7 +25,7 @@ from brasa.core.firmware_index import (
     list_versions,
 )
 from brasa.core.firmware_resolver import fill_from_config
-from brasa.core.lock import port_lock
+from brasa.core.lock import resolved_port_lock
 from brasa.core.port import resolve_port
 from brasa.core.toml_writer import pin_firmware as write_pin
 
@@ -246,8 +246,7 @@ def install(
     if platform == "uf2":
         install_firmware(firmware_path, platform="uf2")
     else:
-        port = resolve_port(port_flag)
-        with port_lock(port, "firmware install"):
+        with resolved_port_lock(port_flag, "firmware install") as port:
             install_firmware(firmware_path, port=port, platform="esp")
 
     path = write_pin(entry.board, entry.variant, entry.version, entry.date)
@@ -275,8 +274,7 @@ def show(
     import json as json_mod
 
     port_flag = ctx.obj.get("port")
-    port = resolve_port(port_flag)
-    with port_lock(port, "firmware show"):
+    with resolved_port_lock(port_flag, "firmware show") as port:
         info = device_firmware_info(port)
 
     if json:

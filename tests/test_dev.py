@@ -1,13 +1,13 @@
 """Tests for the dev command — deploy, watch, redeploy loop."""
 
 import os
-from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from brasa.cli import app
 from brasa.core.config import BrasaConfig
+from tests.conftest import fake_port_lock
 
 runner = CliRunner()
 
@@ -19,13 +19,10 @@ _CFG = BrasaConfig()
 @patch("brasa.commands.dev.SerialReader")
 @patch("brasa.commands.dev.dtr_reset")
 @patch("brasa.commands.dev.deploy")
-@patch("brasa.commands.dev.port_lock", return_value=nullcontext())
-@patch("brasa.commands.dev.resolve_port", return_value=_PORT)
+@patch("brasa.commands.dev.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.dev.require_config", return_value=_CFG)
 def test_initial_deploy_called(
     mock_cfg: MagicMock,
-    mock_port: MagicMock,
-    mock_lock: MagicMock,
     mock_deploy: MagicMock,
     mock_reset: MagicMock,
     mock_reader_cls: MagicMock,
@@ -47,13 +44,10 @@ def test_initial_deploy_called(
 @patch("brasa.commands.dev.SerialReader")
 @patch("brasa.commands.dev.dtr_reset")
 @patch("brasa.commands.dev.deploy")
-@patch("brasa.commands.dev.port_lock", return_value=nullcontext())
-@patch("brasa.commands.dev.resolve_port", return_value=_PORT)
+@patch("brasa.commands.dev.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.dev.require_config", return_value=_CFG)
 def test_file_change_triggers_redeploy(
     mock_cfg: MagicMock,
-    mock_port: MagicMock,
-    mock_lock: MagicMock,
     mock_deploy: MagicMock,
     mock_reset: MagicMock,
     mock_reader_cls: MagicMock,
@@ -81,13 +75,10 @@ def test_file_change_triggers_redeploy(
 @patch("brasa.commands.dev.SerialReader")
 @patch("brasa.commands.dev.dtr_reset")
 @patch("brasa.commands.dev.deploy")
-@patch("brasa.commands.dev.port_lock", return_value=nullcontext())
-@patch("brasa.commands.dev.resolve_port", return_value=_PORT)
+@patch("brasa.commands.dev.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.dev.require_config", return_value=_CFG)
 def test_deploy_retry_logic(
     mock_cfg: MagicMock,
-    mock_port: MagicMock,
-    mock_lock: MagicMock,
     mock_deploy: MagicMock,
     mock_reset: MagicMock,
     mock_reader_cls: MagicMock,
@@ -119,13 +110,10 @@ def test_deploy_retry_logic(
 @patch("brasa.commands.dev.SerialReader")
 @patch("brasa.commands.dev.dtr_reset")
 @patch("brasa.commands.dev.deploy")
-@patch("brasa.commands.dev.port_lock", return_value=nullcontext())
-@patch("brasa.commands.dev.resolve_port", return_value=_PORT)
+@patch("brasa.commands.dev.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.dev.require_config", return_value=_CFG)
 def test_deploy_failure_after_retries(
     mock_cfg: MagicMock,
-    mock_port: MagicMock,
-    mock_lock: MagicMock,
     mock_deploy: MagicMock,
     mock_reset: MagicMock,
     mock_reader_cls: MagicMock,
@@ -154,13 +142,10 @@ def test_deploy_failure_after_retries(
 @patch("brasa.commands.dev.SerialReader")
 @patch("brasa.commands.dev.dtr_reset")
 @patch("brasa.commands.dev.deploy")
-@patch("brasa.commands.dev.port_lock", return_value=nullcontext())
-@patch("brasa.commands.dev.resolve_port", return_value=_PORT)
+@patch("brasa.commands.dev.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.dev.require_config", return_value=_CFG)
 def test_keyboard_interrupt_stops_reader(
     mock_cfg: MagicMock,
-    mock_port: MagicMock,
-    mock_lock: MagicMock,
     mock_deploy: MagicMock,
     mock_reset: MagicMock,
     mock_reader_cls: MagicMock,
@@ -176,13 +161,10 @@ def test_keyboard_interrupt_stops_reader(
 @patch("brasa.commands.dev.SerialReader")
 @patch("brasa.commands.dev.dtr_reset")
 @patch("brasa.commands.dev.deploy")
-@patch("brasa.commands.dev.port_lock", return_value=nullcontext())
-@patch("brasa.commands.dev.resolve_port", return_value=_PORT)
+@patch("brasa.commands.dev.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.dev.require_config", return_value=_CFG)
 def test_port_locked_env_var_set(
     mock_cfg: MagicMock,
-    mock_port: MagicMock,
-    mock_lock: MagicMock,
     mock_deploy: MagicMock,
     mock_reset: MagicMock,
     mock_reader_cls: MagicMock,

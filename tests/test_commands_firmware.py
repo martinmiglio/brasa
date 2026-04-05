@@ -1,7 +1,6 @@
 """Tests for the firmware CLI sub-app commands."""
 
 import time
-from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +9,7 @@ from typer.testing import CliRunner
 from brasa.cli import app
 from brasa.core.config import BrasaConfig, FirmwareConfig
 from brasa.core.firmware_index import BoardIndex, BoardInfo, FirmwareEntry
+from tests.conftest import fake_port_lock
 
 runner = CliRunner()
 
@@ -274,8 +274,7 @@ def test_firmware_download_from_config(
 @patch("brasa.commands.firmware.write_pin")
 @patch("brasa.commands.firmware.install_firmware")
 @patch("brasa.commands.firmware.download_entry", return_value=Path("/cache/f1.bin"))
-@patch("brasa.commands.firmware.resolve_port", return_value="/dev/cu.test")
-@patch("brasa.commands.firmware.port_lock", return_value=nullcontext())
+@patch("brasa.commands.firmware.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.firmware.fetch_board_index", return_value=_INDEX)
 @patch(
     "brasa.commands.firmware.require_config",
@@ -284,8 +283,6 @@ def test_firmware_download_from_config(
 def test_firmware_install_from_config_saves(
     mock_config: MagicMock,
     mock_fetch: MagicMock,
-    mock_lock: MagicMock,
-    mock_port: MagicMock,
     mock_dl: MagicMock,
     mock_install: MagicMock,
     mock_pin: MagicMock,
@@ -324,11 +321,8 @@ def test_firmware_select(mock_fetch: MagicMock, mock_pin: MagicMock) -> None:
         "version": "1.27.0",
     },
 )
-@patch("brasa.commands.firmware.port_lock", return_value=nullcontext())
-@patch("brasa.commands.firmware.resolve_port", return_value="/dev/cu.test")
-def test_firmware_show(
-    mock_port: MagicMock, mock_lock: MagicMock, mock_info: MagicMock
-) -> None:
+@patch("brasa.commands.firmware.resolved_port_lock", fake_port_lock)
+def test_firmware_show(mock_info: MagicMock) -> None:
     result = runner.invoke(app, ["firmware", "show"])
     assert result.exit_code == 0
     assert "ESP8266_GENERIC" in result.output
@@ -343,11 +337,8 @@ def test_firmware_show(
         "version": "1.27.0",
     },
 )
-@patch("brasa.commands.firmware.port_lock", return_value=nullcontext())
-@patch("brasa.commands.firmware.resolve_port", return_value="/dev/cu.test")
-def test_firmware_show_json(
-    mock_port: MagicMock, mock_lock: MagicMock, mock_info: MagicMock
-) -> None:
+@patch("brasa.commands.firmware.resolved_port_lock", fake_port_lock)
+def test_firmware_show_json(mock_info: MagicMock) -> None:
     result = runner.invoke(app, ["firmware", "show", "--json"])
     assert result.exit_code == 0
     assert '"board": "ESP8266_GENERIC"' in result.output

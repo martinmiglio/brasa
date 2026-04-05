@@ -1,6 +1,5 @@
 """Tests for the flash CLI command."""
 
-from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +7,7 @@ from typer.testing import CliRunner
 
 from brasa.cli import app
 from brasa.core.config import BrasaConfig, FirmwareConfig
+from tests.conftest import fake_port_lock
 
 runner = CliRunner()
 
@@ -22,20 +22,17 @@ _VALID_FIRMWARE = BrasaConfig(
 
 
 @patch("brasa.commands.flash.success")
-@patch("brasa.commands.flash.resolve_port", return_value="/dev/cu.test")
-@patch("brasa.commands.flash.port_lock", return_value=nullcontext())
 @patch("brasa.commands.flash.flash_firmware")
 @patch(
     "brasa.commands.flash.download_firmware",
     return_value=Path("firmware/test.bin"),
 )
+@patch("brasa.commands.flash.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.flash.require_config", return_value=_VALID_FIRMWARE)
 def test_flash_command(
     mock_require: MagicMock,
     mock_download: MagicMock,
     mock_flash: MagicMock,
-    mock_lock: MagicMock,
-    mock_resolve: MagicMock,
     mock_success: MagicMock,
 ) -> None:
     """flash command exits 0 on success."""
@@ -47,20 +44,17 @@ def test_flash_command(
 
 
 @patch("brasa.commands.flash.success")
-@patch("brasa.commands.flash.resolve_port", return_value="/dev/cu.test")
-@patch("brasa.commands.flash.port_lock", return_value=nullcontext())
 @patch("brasa.commands.flash.flash_firmware")
 @patch(
     "brasa.commands.flash.download_firmware",
     return_value=Path("firmware/test.bin"),
 )
+@patch("brasa.commands.flash.resolved_port_lock", fake_port_lock)
 @patch("brasa.commands.flash.require_config", return_value=_VALID_FIRMWARE)
 def test_flash_shows_deprecation_warning(
     mock_require: MagicMock,
     mock_download: MagicMock,
     mock_flash: MagicMock,
-    mock_lock: MagicMock,
-    mock_resolve: MagicMock,
     mock_success: MagicMock,
 ) -> None:
     """flash command output contains deprecation notice."""
@@ -106,11 +100,9 @@ def test_flash_errors_missing_date(mock_require: MagicMock) -> None:
     "brasa.commands.flash.download_firmware",
     side_effect=SystemExit(1),
 )
-@patch("brasa.commands.flash.resolve_port", return_value="/dev/cu.test")
 @patch("brasa.commands.flash.require_config", return_value=_VALID_FIRMWARE)
 def test_flash_command_download_fails(
     mock_require: MagicMock,
-    mock_resolve: MagicMock,
     mock_download: MagicMock,
 ) -> None:
     """flash command exits non-zero when firmware download fails."""
