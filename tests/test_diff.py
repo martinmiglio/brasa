@@ -391,6 +391,34 @@ def test_print_diff_with_romfs(capsys: pytest.CaptureFixture[str]) -> None:
     assert "1 local only" in captured.err
 
 
+# ── error paths ───────────────────────────────────────────────────────────
+
+
+@patch(
+    "brasa.core.diff.fs_ls", side_effect=subprocess.CalledProcessError(1, "mpremote")
+)
+def test_diff_device_listing_fails(mock_ls: MagicMock, tmp_path: Path) -> None:
+    """diff_files raises SystemExit when fs_ls for the root listing fails."""
+    cfg = _setup_local(tmp_path, {"boot.py": "# boot"}, romfs=False)
+    with pytest.raises(SystemExit):
+        diff_files("/dev/test", cfg)
+
+
+@patch(
+    "brasa.core.diff.fs_cat", side_effect=subprocess.CalledProcessError(1, "mpremote")
+)
+@patch("brasa.core.diff.fs_ls", return_value="       10 boot.py\n")
+def test_diff_handles_device_file_read_error(
+    mock_ls: MagicMock, mock_cat: MagicMock, tmp_path: Path
+) -> None:
+    """diff_files skips files that cannot be read from the device (fs_cat error)."""
+    cfg = _setup_local(tmp_path, {"boot.py": "# boot"}, romfs=False)
+    diffs = diff_files("/dev/test", cfg)
+    # boot.py is in both local and device, but fs_cat fails — it should be skipped,
+    # resulting in no MODIFIED entries.
+    assert not any(d.status == DiffStatus.MODIFIED for d in diffs)
+
+
 # ── diff command wiring ────────────────────────────────────────────────────
 
 
