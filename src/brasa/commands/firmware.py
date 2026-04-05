@@ -146,9 +146,7 @@ def _resolve_entry(
         return FirmwareEntry.from_config(fw.board, fw.variant, fw.version, fw.date)
 
     cfg = load_config() if use_config else None
-    resolved_board = _resolve_board(
-        board, port=port, use_config=use_config, config=cfg
-    )
+    resolved_board = _resolve_board(board, port=port, use_config=use_config, config=cfg)
 
     # Fill variant/version from config if not given via CLI flags
     if cfg and (variant is None or version is None):
