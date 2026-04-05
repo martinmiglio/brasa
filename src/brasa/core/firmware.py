@@ -16,19 +16,16 @@ from brasa.core.firmware_resolver import firmware_ext, firmware_filename
 _BASE_URL = "https://micropython.org/resources/firmware"
 
 
-def _firmware_filename(cfg: FirmwareConfig) -> str:
-    """Build the firmware binary filename from config."""
-    return firmware_filename(cfg.board, cfg.variant, cfg.version, cfg.date)
-
-
 def firmware_url(cfg: FirmwareConfig) -> str:
     """Build the MicroPython firmware download URL."""
-    return f"{_BASE_URL}/{_firmware_filename(cfg)}"
+    return f"{_BASE_URL}/{firmware_filename(cfg.board, cfg.variant, cfg.version, cfg.date)}"
 
 
 def firmware_cache_path(cfg: FirmwareConfig) -> Path:
     """Return the local cache path for the firmware binary (~/.cache/brasa/firmware/)."""
-    return cache_dir() / _firmware_filename(cfg)
+    return cache_dir() / firmware_filename(
+        cfg.board, cfg.variant, cfg.version, cfg.date
+    )
 
 
 def _download_file(url: str, dest: Path) -> Path:

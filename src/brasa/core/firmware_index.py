@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 
 from brasa.core import output
-from brasa.core.firmware_resolver import firmware_ext
+from brasa.core.firmware_resolver import firmware_ext, firmware_filename
 
 _BASE_URL = "https://micropython.org"
 _INDEX_TTL = 3600  # 1 hour
@@ -49,8 +49,7 @@ class FirmwareEntry:
     ) -> FirmwareEntry:
         """Build a FirmwareEntry from config values, inferring filename and URL."""
         ext = firmware_ext(board)
-        variant_part = f"-{variant}" if variant else ""
-        filename = f"{board}{variant_part}-{date}-v{version}.{ext}"
+        filename = firmware_filename(board, variant, version, date)
         return cls(
             board=board,
             variant=variant,
@@ -218,6 +217,20 @@ def find_entry(index: BoardIndex, variant: str, version: str) -> FirmwareEntry |
         if entry.variant == variant and entry.version == version:
             return entry
     return None
+
+
+def find_entry_or_construct(
+    index: BoardIndex,
+    board: str,
+    variant: str,
+    version: str,
+    date: str,
+) -> FirmwareEntry:
+    """Find entry in index, falling back to constructing one from config values."""
+    entry = find_entry(index, variant, version)
+    if entry:
+        return entry
+    return FirmwareEntry.from_config(board, variant, version, date)
 
 
 # ── Global board list ──────────────────────────────────────────────────────

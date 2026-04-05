@@ -57,7 +57,7 @@ class TestResolveBoard:
         # Mock device detection to return something so we don't hit questionary.
         with patch("brasa.commands.firmware.resolve_port", return_value="/dev/test"):
             with patch(
-                "brasa.commands.firmware.resolve_board_from_device",
+                "brasa.commands.firmware.detect_board",
                 return_value="RPI_PICO",
             ):
                 with patch(
@@ -67,7 +67,7 @@ class TestResolveBoard:
 
     @patch("brasa.commands.firmware._is_interactive", return_value=False)
     @patch(
-        "brasa.commands.firmware.resolve_board_from_device",
+        "brasa.commands.firmware.detect_board",
         return_value="ESP8266_GENERIC",
     )
     @patch("brasa.commands.firmware.resolve_port", return_value="/dev/test")
@@ -84,7 +84,7 @@ class TestResolveBoard:
         assert _resolve_board(None) == "ESP8266_GENERIC"
 
     @patch("brasa.commands.firmware._is_interactive", return_value=True)
-    @patch("brasa.commands.firmware.resolve_board_from_device", return_value=None)
+    @patch("brasa.commands.firmware.detect_board", return_value=None)
     @patch("brasa.commands.firmware.resolve_port", side_effect=SystemExit(1))
     @patch("brasa.commands.firmware.load_config", return_value=_CFG_NO_FIRMWARE)
     def test_device_detection_failure_does_not_crash(

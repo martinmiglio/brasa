@@ -8,7 +8,7 @@ import typer
 
 from brasa.core import output
 from brasa.core.config import BrasaConfig, load_config, require_config
-from brasa.core.device import device_firmware_info
+from brasa.core.device import detect_board, device_firmware_info
 from brasa.core.firmware import (
     download_entry,
     install_firmware,
@@ -20,15 +20,11 @@ from brasa.core.firmware_index import (
     fetch_board_index,
     fetch_board_list,
     find_entry,
+    find_entry_or_construct,
     list_variants,
     list_versions,
 )
-from brasa.core.firmware_resolver import (
-    fill_from_config,
-    find_entry_or_construct,
-    resolve_board_from_config,
-    resolve_board_from_device,
-)
+from brasa.core.firmware_resolver import fill_from_config
 from brasa.core.lock import port_lock
 from brasa.core.port import resolve_port
 from brasa.core.toml_writer import pin_firmware as write_pin
@@ -48,7 +44,7 @@ def _is_interactive() -> bool:
 def _require_interactive(flag_name: str) -> None:
     """Exit with an error if not running in an interactive terminal."""
     if not _is_interactive():
-        output.error(f"{flag_name} requires an interactive terminal or --{flag_name}")
+        output.error(f"--{flag_name} is required when not running interactively")
         raise SystemExit(1)
 
 
@@ -68,15 +64,14 @@ def _resolve_board(
 
     if use_config:
         cfg = config or load_config()
-        resolved = resolve_board_from_config(cfg)
-        if resolved:
-            output.status("firmware", f"using board from config: {resolved}")
-            return resolved
+        if cfg.firmware.board and cfg.firmware.version:
+            output.status("firmware", f"using board from config: {cfg.firmware.board}")
+            return cfg.firmware.board
 
     # Device auto-detect (best-effort)
     try:
         resolved_port = resolve_port(port)
-        detected = resolve_board_from_device(resolved_port)
+        detected = detect_board(resolved_port)
         if detected:
             if not _is_interactive():
                 return detected
